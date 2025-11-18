@@ -1,0 +1,85 @@
+name: Daily News Collection
+
+on:
+  schedule:
+    # Twice daily: Market open (9:30am ET) and market close (4:00pm ET)
+    # 9:30am ET = 14:30 UTC, 4:00pm ET = 21:00 UTC
+    # Note: Adjust for daylight saving time if needed (EDT vs EST)
+    - cron: '30 14 * * 1-5'  # 9:30am ET
+    - cron: '0 21 * * 1-5'   # 4:00pm ET
+  workflow_dispatch:  # Allow manual trigger
+
+env:
+  FINNHUB_API_KEY: ${{ secrets.FINNHUB_API_KEY }}
+  DATA_REPO: GibsonNeo/deanfi-data
+  GITHUB_PAT: ${{ secrets.GITHUB_PAT }}
+
+jobs:
+  fetch-and-publish:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout collectors repo
+        uses: actions/checkout@v4
+      
+      - name: Checkout data repo
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ env.DATA_REPO }}
+          token: ${{ secrets.GITHUB_PAT }}
+          path: data-cache
+      
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+      
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt
+      
+      - name: Fetch top news
+        run: |
+          cd dailynews
+          python fetch_top_news.py
+          echo "✅ Top news fetched"
+      
+      - name: Fetch sector news
+        run: |
+          cd dailynews
+          python fetch_sector_news.py
+          echo "✅ Sector news fetched"
+      
+      - name: Copy to data repo
+        run: |
+          mkdir -p data-cache/daily-news
+          cp dailynews/top_news.json data-cache/daily-news/
+          cp dailynews/sector_news.json data-cache/daily-news/
+          echo "✅ Files copied to data repo"
+      
+      - name: Update metadata
+        run: |
+          cd data-cache
+          TIMESTAMP=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+          
+          # Update metadata.json with timestamp using simple sed
+          if [ -f metadata.json ]; then
+            sed -i "s/\"last_updated\": \".*\"/\"last_updated\": \"$TIMESTAMP\"/" metadata.json
+            echo "✅ Metadata updated"
+          fi
+      
+      - name: Commit and push to data repo
+        run: |
+          cd data-cache
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add daily-news/ metadata.json
+          
+          if git diff --staged --quiet; then
+            echo "No changes to commit"
+          else
+            git commit -m "chore: update daily news - $(date -u +"%Y-%m-%d %H:%M UTC")"
+            git push
+            echo "✅ Data pushed to deanfi-data repository"
+          fi

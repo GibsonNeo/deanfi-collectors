@@ -1,0 +1,68 @@
+# Earnings Surprises Configuration
+# API: Finnhub Stock Earnings Endpoint
+# Free Tier: Last 4 quarters of data
+#
+# For local development: Set FINNHUB_API_KEY environment variable
+# For GitHub Actions: Set FINNHUB_API_KEY in repository secrets
+
+api:
+  # API key loaded from environment variable (not hardcoded for security)
+  # Set via: export FINNHUB_API_KEY="your_key_here"
+  key: "${FINNHUB_API_KEY}"
+  base_url: "https://finnhub.io/api/v1"
+  endpoint: "/stock/earnings"
+  
+rate_limiting:
+  # Finnhub free tier: 60 calls/minute
+  # Using 60 for maximum throughput
+  calls_per_minute: 60
+  delay_between_calls: 1.0  # seconds (60s / 60 calls = 1.0s)
+  window_size: 60  # seconds
+
+data:
+  # Request last 4 quarters (free tier limit)
+  quarters_to_fetch: 4
+  
+  # Tickers to exclude (duplicates or special cases)
+  exclude_tickers:
+    - "GOOG"      # Exclude Class C, keep GOOGL
+    - "BRK.A"     # Exclude Class A, keep BRK-B
+    - "FOX"       # Exclude Class B, keep FOXA
+    - "NWS"       # Exclude Class B, keep NWSA
+
+# Classification thresholds for earnings surprises
+surprise_classification:
+  # Surprise percent thresholds
+  strong_beat_threshold: 5.0      # > 5% surprise = strong beat
+  beat_threshold: 0.0             # 0% to 5% = beat
+  meet_threshold: 0.5             # ±0.5% = meet expectations
+  miss_threshold: -5.0            # 0% to -5% = miss
+  # < -5% = strong miss
+  
+  # Categories (for reference)
+  categories:
+    - "strong_beat"    # surprisePercent > 5%
+    - "beat"           # 0% < surprisePercent <= 5%
+    - "meet"           # -0.5% <= surprisePercent <= 0.5%
+    - "miss"           # -5% <= surprisePercent < 0%
+    - "strong_miss"    # surprisePercent < -5%
+
+# Output files
+output:
+  raw_data: "earnings_surprises.json"
+  sector_aggregation: "sector_earnings_surprises.json"
+  ticker_analysis: "ticker_surprises_analysis.json"
+  leading_companies: "leading_companies_by_sector.json"
+
+# Top movers analysis
+analysis:
+  # Top N companies with best/worst surprises
+  top_movers_count: 25
+  
+  # Metrics to track
+  metrics:
+    - "average_surprise_percent"
+    - "beat_rate"               # % of quarters beating
+    - "beat_streak"             # consecutive quarters beating
+    - "trend_direction"         # improving/declining
+    - "consistency_score"       # standard deviation of surprises

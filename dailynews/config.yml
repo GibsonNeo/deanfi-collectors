@@ -1,0 +1,41 @@
+# Finnhub API Configuration
+# Get your API key at: https://finnhub.io/dashboard
+# 
+# For local development: Set FINNHUB_API_KEY environment variable
+# For GitHub Actions: Set FINNHUB_API_KEY in repository secrets
+
+api:
+  # API key loaded from environment variable (not hardcoded for security)
+  # Set via: export FINNHUB_API_KEY="your_key_here"
+  finnhub_api_key: "${FINNHUB_API_KEY}"
+  base_url: "https://finnhub.io/api/v1"
+
+news:
+  # Number of days to look back for news
+  lookback_days: 3
+  
+  # Maximum number of articles to return
+  max_articles: 100
+  
+  # News source priority (1 = highest priority)
+  # Articles will be ranked by this order, then by recency
+  # Common sources: Bloomberg, CNBC, MarketWatch, Reuters, Yahoo, SeekingAlpha, Benzinga
+  source_priority:
+    - source: Bloomberg
+      priority: 1
+    - source: CNBC
+      priority: 2
+    - source: MarketWatch
+      priority: 3
+    - source: Reuters
+      priority: 4
+    - source: Yahoo
+      priority: 5
+    - source: SeekingAlpha
+      priority: 6
+  
+  # Sources to exclude completely (optional)
+  # Add sources here that you want to filter out entirely
+  excluded_sources:
+    - Benzinga
+    - TheStreet

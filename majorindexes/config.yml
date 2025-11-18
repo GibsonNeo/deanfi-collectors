@@ -1,0 +1,507 @@
+# Major Indices Configuration
+# Defines all market indices to track across 9 categories
+# Total: 98+ indices covering global markets, sectors, styles, commodities, and bonds
+
+# ==============================================================================
+# US MAJOR INDICES (6 indices)
+# ==============================================================================
+us_major_indices:
+  description: "Core US equity indices representing broad market, large-cap, mid-cap, and small-cap segments"
+  output_files:
+    snapshot: "us_major_indices.json"
+    historical: "us_major_indices_historical.json"
+  indices:
+    - symbol: "^GSPC"
+      name: "S&P 500"
+      description: "Large-cap benchmark (500 companies)"
+      market_cap_segment: "Large-Cap"
+      constituent_count: 500
+      
+    - symbol: "^DJI"
+      name: "Dow Jones Industrial Average"
+      description: "Blue-chip 30 companies"
+      market_cap_segment: "Large-Cap"
+      constituent_count: 30
+      
+    - symbol: "^IXIC"
+      name: "Nasdaq Composite"
+      description: "Tech-heavy broad market"
+      market_cap_segment: "All-Cap"
+      constituent_count: 3000
+      
+    - symbol: "^NDX"
+      name: "Nasdaq-100"
+      description: "Top 100 non-financial Nasdaq stocks"
+      market_cap_segment: "Large-Cap"
+      constituent_count: 100
+      
+    - symbol: "^RUT"
+      name: "Russell 2000"
+      description: "Small-cap benchmark"
+      market_cap_segment: "Small-Cap"
+      constituent_count: 2000
+      
+    - symbol: "^VIX"
+      name: "CBOE Volatility Index"
+      description: "Market fear gauge (VIX)"
+      market_cap_segment: "N/A"
+      constituent_count: 0
+      special_notes: "Measures implied volatility, not price index"
+
+# ==============================================================================
+# US GROWTH/VALUE INDICES (5 indices)
+# ==============================================================================
+us_growth_value_indices:
+  description: "Russell growth and value indices across large-cap and small-cap segments"
+  output_files:
+    snapshot: "us_growth_value_indices.json"
+    historical: "us_growth_value_indices_historical.json"
+  style_definitions:
+    growth: "Companies with higher price-to-book ratios, expected faster earnings growth"
+    value: "Companies with lower price-to-book ratios, trading at discounts to intrinsic value"
+  indices:
+    - symbol: "^RLG"
+      name: "Russell 1000 Growth"
+      description: "Large-cap growth stocks"
+      style: "growth"
+      market_cap: "large"
+      
+    - symbol: "^RLV"
+      name: "Russell 1000 Value"
+      description: "Large-cap value stocks"
+      style: "value"
+      market_cap: "large"
+      
+    - symbol: "^RUO"
+      name: "Russell 2000 Growth"
+      description: "Small-cap growth stocks"
+      style: "growth"
+      market_cap: "small"
+      
+    - symbol: "^RUJ"
+      name: "Russell 2000 Value"
+      description: "Small-cap value stocks"
+      style: "value"
+      market_cap: "small"
+      
+    - symbol: "^RUA"
+      name: "Russell 3000"
+      description: "Total US equity market (98% coverage)"
+      style: "blend"
+      market_cap: "all"
+      constituent_count: 3000
+
+# ==============================================================================
+# US EQUAL-WEIGHT INDICES (4 indices)
+# ==============================================================================
+us_equal_weight_indices:
+  description: "Equal-weighted versions of major indices (each stock has same weight regardless of market cap)"
+  output_files:
+    snapshot: "us_equal_weight_indices.json"
+    historical: "us_equal_weight_indices_historical.json"
+  indices:
+    - symbol: "^SPXEW"
+      name: "S&P 500 Equal Weight Index"
+      description: "S&P 500 with equal weighting"
+      parent_index: "^GSPC"
+      
+    - symbol: "^NDXE"
+      name: "Nasdaq-100 Equal Weight Index"
+      description: "Nasdaq-100 with equal weighting"
+      parent_index: "^NDX"
+      
+    - symbol: "RSP"
+      name: "Invesco S&P 500 Equal Weight ETF"
+      description: "S&P 500 equal weight ETF"
+      parent_index: "^GSPC"
+      is_etf: true
+      
+    - symbol: "QQEW"
+      name: "First Trust Nasdaq-100 Equal Weight ETF"
+      description: "Nasdaq-100 equal weight ETF"
+      parent_index: "^NDX"
+      is_etf: true
+
+# ==============================================================================
+# US SECTOR INDICES (11 sectors - GICS Classification)
+# ==============================================================================
+us_sector_indices:
+  description: "11 GICS sectors via Select Sector SPDR ETFs"
+  output_files:
+    snapshot: "us_sector_indices.json"
+    historical: "us_sector_indices_historical.json"
+  benchmark: "^GSPC"
+  sectors:
+    - symbol: "XLK"
+      name: "Technology Select Sector SPDR Fund"
+      sector_name: "Technology"
+      gics_code: "45"
+      description: "Software, semiconductors, IT services, hardware"
+      
+    - symbol: "XLV"
+      name: "Health Care Select Sector SPDR Fund"
+      sector_name: "Health Care"
+      gics_code: "35"
+      description: "Pharma, biotech, health equipment, providers"
+      
+    - symbol: "XLF"
+      name: "Financial Select Sector SPDR Fund"
+      sector_name: "Financials"
+      gics_code: "40"
+      description: "Banks, insurance, capital markets, REITs"
+      
+    - symbol: "XLY"
+      name: "Consumer Discretionary Select Sector SPDR Fund"
+      sector_name: "Consumer Discretionary"
+      gics_code: "25"
+      description: "Retail, automotive, leisure, hotels, restaurants"
+      
+    - symbol: "XLI"
+      name: "Industrial Select Sector SPDR Fund"
+      sector_name: "Industrials"
+      gics_code: "20"
+      description: "Aerospace, defense, machinery, transportation"
+      
+    - symbol: "XLP"
+      name: "Consumer Staples Select Sector SPDR Fund"
+      sector_name: "Consumer Staples"
+      gics_code: "30"
+      description: "Food, beverage, tobacco, household products"
+      
+    - symbol: "XLE"
+      name: "Energy Select Sector SPDR Fund"
+      sector_name: "Energy"
+      gics_code: "10"
+      description: "Oil, gas, consumable fuels, energy equipment"
+      
+    - symbol: "XLB"
+      name: "Materials Select Sector SPDR Fund"
+      sector_name: "Materials"
+      gics_code: "15"
+      description: "Chemicals, construction materials, metals, mining"
+      
+    - symbol: "XLC"
+      name: "Communication Services Select Sector SPDR Fund"
+      sector_name: "Communication Services"
+      gics_code: "50"
+      description: "Media, entertainment, telecom, interactive media"
+      
+    - symbol: "XLU"
+      name: "Utilities Select Sector SPDR Fund"
+      sector_name: "Utilities"
+      gics_code: "55"
+      description: "Electric, gas, water utilities, renewable energy"
+      
+    - symbol: "XLRE"
+      name: "Real Estate Select Sector SPDR Fund"
+      sector_name: "Real Estate"
+      gics_code: "60"
+      description: "REITs, real estate management and development"
+
+# ==============================================================================
+# INTERNATIONAL MAJOR INDICES (11 indices)
+# ==============================================================================
+international_major_indices:
+  description: "Major developed market indices from Europe, Asia, and other regions"
+  output_files:
+    snapshot: "international_major_indices.json"
+    historical: "international_major_indices_historical.json"
+  regions:
+    europe:
+      - symbol: "^FTSE"
+        name: "FTSE 100"
+        country: "United Kingdom"
+        currency: "GBP"
+        trading_hours_utc: "08:00-16:30"
+        
+      - symbol: "^GDAXI"
+        name: "DAX"
+        country: "Germany"
+        currency: "EUR"
+        trading_hours_utc: "08:00-16:30"
+        
+      - symbol: "^FCHI"
+        name: "CAC 40"
+        country: "France"
+        currency: "EUR"
+        trading_hours_utc: "08:00-16:30"
+        
+      - symbol: "^STOXX50E"
+        name: "EURO STOXX 50"
+        country: "Eurozone"
+        currency: "EUR"
+        trading_hours_utc: "08:00-16:30"
+        constituent_count: 50
+        
+      - symbol: "^SSMI"
+        name: "Swiss Market Index"
+        country: "Switzerland"
+        currency: "CHF"
+        trading_hours_utc: "08:00-16:30"
+        
+    asia_pacific:
+      - symbol: "^N225"
+        name: "Nikkei 225"
+        country: "Japan"
+        currency: "JPY"
+        trading_hours_utc: "00:00-06:00"
+        constituent_count: 225
+        
+      - symbol: "^HSI"
+        name: "Hang Seng Index"
+        country: "Hong Kong"
+        currency: "HKD"
+        trading_hours_utc: "01:30-08:00"
+        
+      - symbol: "^AXJO"
+        name: "S&P/ASX 200"
+        country: "Australia"
+        currency: "AUD"
+        trading_hours_utc: "00:00-06:00"
+        constituent_count: 200
+        
+      - symbol: "^KS11"
+        name: "KOSPI Composite Index"
+        country: "South Korea"
+        currency: "KRW"
+        trading_hours_utc: "00:00-06:30"
+        
+    other:
+      - symbol: "^GSPTSE"
+        name: "S&P/TSX Composite"
+        country: "Canada"
+        currency: "CAD"
+        trading_hours_utc: "14:30-21:00"
+        
+      - symbol: "^TA125.TA"
+        name: "TA-125"
+        country: "Israel"
+        currency: "ILS"
+        trading_hours_utc: "07:00-14:25"
+        constituent_count: 125
+
+# ==============================================================================
+# EMERGING MARKETS INDICES (6 indices)
+# ==============================================================================
+emerging_markets_indices:
+  description: "Key emerging market equity indices from Latin America, Asia, and other regions"
+  output_files:
+    snapshot: "emerging_markets_indices.json"
+    historical: "emerging_markets_indices_historical.json"
+  indices:
+    - symbol: "^BVSP"
+      name: "IBOVESPA"
+      country: "Brazil"
+      currency: "BRL"
+      region: "Latin America"
+      description: "Brazil Bovespa - Latin America's largest market"
+      
+    - symbol: "^MXX"
+      name: "IPC Mexico"
+      country: "Mexico"
+      currency: "MXN"
+      region: "Latin America"
+      description: "Mexico IPC - North American emerging market"
+      
+    - symbol: "^BSESN"
+      name: "S&P BSE Sensex"
+      country: "India"
+      currency: "INR"
+      region: "Asia"
+      description: "India BSE Sensex - Fast-growing Asian economy"
+      constituent_count: 30
+      
+    - symbol: "^NSEI"
+      name: "Nifty 50"
+      country: "India"
+      currency: "INR"
+      region: "Asia"
+      description: "India NSE Nifty 50 - NSE benchmark"
+      constituent_count: 50
+      
+    - symbol: "^TWII"
+      name: "Taiwan Weighted Index"
+      country: "Taiwan"
+      currency: "TWD"
+      region: "Asia"
+      description: "Taiwan Weighted - Tech manufacturing hub"
+      
+    - symbol: "^JKSE"
+      name: "Jakarta Composite Index"
+      country: "Indonesia"
+      currency: "IDR"
+      region: "Asia"
+      description: "Indonesia Jakarta Composite - Southeast Asian leader"
+
+# ==============================================================================
+# DOW JONES FAMILY INDICES (4 indices)
+# ==============================================================================
+dow_family_indices:
+  description: "Dow Jones index family including Industrial, Transportation, Utility, and Composite"
+  output_files:
+    snapshot: "dow_family_indices.json"
+    historical: "dow_family_indices_historical.json"
+  indices:
+    - symbol: "^DJI"
+      name: "Dow Jones Industrial Average"
+      description: "30 large-cap blue-chip industrials"
+      constituent_count: 30
+      sector_focus: "Industrials"
+      
+    - symbol: "^DJT"
+      name: "Dow Jones Transportation Average"
+      description: "20 transportation companies (airlines, railroads, trucking)"
+      constituent_count: 20
+      sector_focus: "Transportation"
+      
+    - symbol: "^DJU"
+      name: "Dow Jones Utility Average"
+      description: "15 utility companies (electric, gas, water)"
+      constituent_count: 15
+      sector_focus: "Utilities"
+      
+    - symbol: "^DJA"
+      name: "Dow Jones Composite Average"
+      description: "Combination of Industrial, Transportation, and Utility (65 stocks)"
+      constituent_count: 65
+      sector_focus: "All"
+
+# ==============================================================================
+# BOND/TREASURY INDICES (4 indices)
+# ==============================================================================
+bond_treasury_indices:
+  description: "US Treasury yield indices across different maturities"
+  output_files:
+    snapshot: "bond_treasury_indices.json"
+    historical: "bond_treasury_indices_historical.json"
+  indices:
+    - symbol: "^TNX"
+      name: "CBOE 10-Year Treasury Yield"
+      description: "10-Year US Treasury Note Yield"
+      maturity_years: 10
+      duration: "Intermediate"
+      interpretation: "Benchmark for mortgage rates and corporate bonds"
+      
+    - symbol: "^TYX"
+      name: "CBOE 30-Year Treasury Yield"
+      description: "30-Year US Treasury Bond Yield"
+      maturity_years: 30
+      duration: "Long"
+      interpretation: "Long-term rate expectations, most sensitive to inflation"
+      
+    - symbol: "^FVX"
+      name: "CBOE 5-Year Treasury Yield"
+      description: "5-Year US Treasury Note Yield"
+      maturity_years: 5
+      duration: "Intermediate"
+      interpretation: "Mid-term economic expectations"
+      
+    - symbol: "^IRX"
+      name: "CBOE 13-Week Treasury Bill Yield"
+      description: "13-Week US Treasury Bill Yield"
+      maturity_weeks: 13
+      maturity_years: 0.25
+      duration: "Short"
+      interpretation: "Risk-free rate, Fed policy indicator"
+  yield_curve_analysis: true
+
+# ==============================================================================
+# COMMODITY INDICES (5 indices)
+# ==============================================================================
+commodity_indices:
+  description: "Major commodity indices and futures"
+  output_files:
+    snapshot: "commodity_indices.json"
+    historical: "commodity_indices_historical.json"
+  indices:
+    - symbol: "GC=F"
+      name: "Gold Futures"
+      description: "Gold spot price ($/oz)"
+      commodity_type: "Precious Metal"
+      unit: "$/troy ounce"
+      
+    - symbol: "SI=F"
+      name: "Silver Futures"
+      description: "Silver spot price ($/oz)"
+      commodity_type: "Precious Metal"
+      unit: "$/troy ounce"
+      
+    - symbol: "CL=F"
+      name: "Crude Oil Futures (WTI)"
+      description: "West Texas Intermediate crude oil ($/barrel)"
+      commodity_type: "Energy"
+      unit: "$/barrel"
+      
+    - symbol: "NG=F"
+      name: "Natural Gas Futures"
+      description: "Henry Hub natural gas ($/MMBtu)"
+      commodity_type: "Energy"
+      unit: "$/MMBtu"
+      
+    - symbol: "DBC"
+      name: "Invesco DB Commodity Index Tracking Fund"
+      description: "Broad commodity basket ETF"
+      commodity_type: "Diversified"
+      is_etf: true
+
+# ==============================================================================
+# CURRENCY INDICES (1 index)
+# ==============================================================================
+currency_indices:
+  description: "US Dollar strength index"
+  output_files:
+    snapshot: "currency_indices.json"
+    historical: "currency_indices_historical.json"
+  indices:
+    - symbol: "DX-Y.NYB"
+      name: "US Dollar Index (DXY)"
+      description: "Measures USD vs basket of 6 major currencies (EUR, JPY, GBP, CAD, SEK, CHF)"
+      interpretation: ">100 = strong dollar, <100 = weak dollar"
+      basket_currencies:
+        - EUR: 57.6%
+        - JPY: 13.6%
+        - GBP: 11.9%
+        - CAD: 9.1%
+        - SEK: 4.2%
+        - CHF: 3.6%
+
+# ==============================================================================
+# GLOBAL SETTINGS
+# ==============================================================================
+settings:
+  historical_days: 252  # 1 trading year
+  data_source: "Yahoo Finance (yfinance)"
+  update_frequency: "On-demand (manual script execution)"
+  timezone: "US/Eastern"
+  
+  technical_indicators:
+    moving_averages: [20, 50, 200]
+    rsi_period: 14
+    macd:
+      fast: 12
+      slow: 26
+      signal: 9
+    bollinger_bands:
+      period: 20
+      std_dev: 2
+      
+  data_quality_checks:
+    - "status: complete | partial | stale"
+    - "missing_days: count of gaps in 252-day history"
+    - "last_update: ISO 8601 timestamp"
+    - "market_hours: pre | during | post | closed"
+    
+  output_format: "JSON with human-readable _README sections"
+  
+  performance_metrics:
+    - "year_to_date_return"
+    - "1_month_return (21 days)"
+    - "3_month_return (63 days)"
+    - "6_month_return (126 days)"
+    - "1_year_return (252 days)"
+    - "52_week_high"
+    - "52_week_low"
+    - "distance_from_52w_high"
+    - "volatility_annual"
+    - "sharpe_ratio"
+    - "max_drawdown"

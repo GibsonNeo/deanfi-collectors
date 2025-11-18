@@ -1,0 +1,27 @@
+# Finnhub API Configuration for Recommendation Trends
+# Get your API key at: https://finnhub.io/dashboard
+#
+# For local development: Set FINNHUB_API_KEY environment variable
+# For GitHub Actions: Set FINNHUB_API_KEY in repository secrets
+
+api:
+  # API key loaded from environment variable (not hardcoded for security)
+  # Set via: export FINNHUB_API_KEY="your_key_here"
+  finnhub_api_key: "${FINNHUB_API_KEY}"
+  base_url: "https://finnhub.io/api/v1"
+
+recommendation_trends:
+  # Number of periods to retrieve (latest periods available)
+  num_periods: 3
+  
+  # Ticker deduplication: Keep only the most liquid ticker when duplicates exist
+  # Maps duplicate ticker -> preferred ticker (most liquid)
+  ticker_exclusions:
+    # Google: Keep GOOGL (Class A - more liquid)
+    - "GOOG"
+    # Berkshire Hathaway: Keep BRK.B (more accessible, higher volume)
+    - "BRK.A"
+    # Fox: Keep FOXA (Class A - more liquid)
+    - "FOX"
+    # News Corp: Keep NWSA (Class A - more liquid) 
+    - "NWS"

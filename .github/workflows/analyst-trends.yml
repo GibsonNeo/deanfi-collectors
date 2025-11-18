@@ -1,0 +1,71 @@
+name: Analyst Trends Collection
+
+on:
+  schedule:
+    # Weekly on Sunday at 12:00pm ET (17:00 UTC)
+    # Note: Adjust for daylight saving time if needed (EDT vs EST)
+    - cron: '0 17 * * 0'
+  workflow_dispatch:
+
+env:
+  FINNHUB_API_KEY: ${{ secrets.FINNHUB_API_KEY }}
+  DATA_REPO: GibsonNeo/deanfi-data
+  GITHUB_PAT: ${{ secrets.GITHUB_PAT }}
+
+jobs:
+  fetch-and-publish:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout collectors repo
+        uses: actions/checkout@v4
+      
+      - name: Checkout data repo
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ env.DATA_REPO }}
+          token: ${{ secrets.GITHUB_PAT }}
+          path: data-cache
+      
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+      
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+      
+      - name: Fetch recommendation trends
+        run: |
+          cd analysttrends
+          python fetch_recommendation_trends.py
+          echo "✅ Recommendation trends fetched"
+      
+      - name: Aggregate by sector
+        run: |
+          cd analysttrends
+          python aggregate_by_sector.py
+          echo "✅ Sector aggregation complete"
+      
+      - name: Copy to data repo
+        run: |
+          mkdir -p data-cache/analyst-trends
+          cp analysttrends/recommendation_trends.json data-cache/analyst-trends/
+          cp analysttrends/sector_recommendation_trends.json data-cache/analyst-trends/
+          echo "✅ Files copied to data repo"
+      
+      - name: Commit and push
+        run: |
+          cd data-cache
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add analyst-trends/
+          
+          if git diff --staged --quiet; then
+            echo "No changes to commit"
+          else
+            git commit -m "chore: update analyst trends - $(date -u +"%Y-%m-%d")"
+            git push
+            echo "✅ Data pushed to repository"
+          fi

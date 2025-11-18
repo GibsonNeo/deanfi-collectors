@@ -1,0 +1,115 @@
+# Implied Volatility Tracking Configuration
+# Data source: yfinance (Yahoo Finance) - Options data with implied volatility
+
+# All 11 S&P 500 Sector ETFs
+sector_etfs:
+  XLK:
+    name: "Technology Select Sector SPDR Fund"
+    sector: "Technology"
+    description: "Information Technology sector companies"
+  
+  XLV:
+    name: "Health Care Select Sector SPDR Fund"
+    sector: "Health Care"
+    description: "Health care equipment & services, pharmaceuticals, biotech"
+  
+  XLF:
+    name: "Financial Select Sector SPDR Fund"
+    sector: "Financials"
+    description: "Banks, insurance, real estate, capital markets"
+  
+  XLE:
+    name: "Energy Select Sector SPDR Fund"
+    sector: "Energy"
+    description: "Oil, gas, consumable fuels, energy equipment & services"
+  
+  XLY:
+    name: "Consumer Discretionary Select Sector SPDR Fund"
+    sector: "Consumer Discretionary"
+    description: "Automobiles, consumer durables, hotels, restaurants, retail"
+  
+  XLP:
+    name: "Consumer Staples Select Sector SPDR Fund"
+    sector: "Consumer Staples"
+    description: "Food, beverages, tobacco, household products"
+  
+  XLI:
+    name: "Industrial Select Sector SPDR Fund"
+    sector: "Industrials"
+    description: "Aerospace, defense, machinery, transportation"
+  
+  XLU:
+    name: "Utilities Select Sector SPDR Fund"
+    sector: "Utilities"
+    description: "Electric, gas, water utilities"
+  
+  XLB:
+    name: "Materials Select Sector SPDR Fund"
+    sector: "Materials"
+    description: "Chemicals, construction materials, metals & mining"
+  
+  XLRE:
+    name: "Real Estate Select Sector SPDR Fund"
+    sector: "Real Estate"
+    description: "REITs and real estate management & development"
+  
+  XLC:
+    name: "Communication Services Select Sector SPDR Fund"
+    sector: "Communication Services"
+    description: "Telecom, media & entertainment, interactive media"
+
+# Major Index ETFs
+major_indices:
+  SPY:
+    name: "SPDR S&P 500 ETF Trust"
+    index: "S&P 500"
+    description: "Largest 500 U.S. companies by market cap"
+  
+  QQQ:
+    name: "Invesco QQQ Trust"
+    index: "Nasdaq-100"
+    description: "100 largest non-financial Nasdaq companies"
+  
+  IWM:
+    name: "iShares Russell 2000 ETF"
+    index: "Russell 2000"
+    description: "Small-cap U.S. equities"
+  
+  DIA:
+    name: "SPDR Dow Jones Industrial Average ETF"
+    index: "Dow Jones"
+    description: "30 large U.S. blue-chip companies"
+
+# VIX Options (Special case - volatility of volatility)
+vix:
+  ^VIX:
+    name: "CBOE Volatility Index"
+    description: "Market's expectation of 30-day S&P 500 volatility"
+    note: "VIX options measure volatility of volatility - unique characteristics"
+
+# Options Selection Criteria
+options_criteria:
+  # Which expiration to use for ATM IV snapshot
+  expiration_preference: "nearest"  # Options: nearest, 30-day, 60-day
+  
+  # Days to expiration range for filtering
+  min_dte: 7      # Minimum days to expiration (avoid weekly expiry issues)
+  max_dte: 60     # Maximum days to expiration (focus on near-term)
+  
+  # ATM selection tolerance (% from underlying price)
+  atm_tolerance: 0.02  # 2% - find strike within 2% of current price
+  
+  # Liquidity filters
+  min_volume: 0        # Minimum option volume (0 = no filter)
+  min_open_interest: 0 # Minimum open interest (0 = no filter)
+
+# Output Files
+output:
+  sector_etfs:
+    snapshot: "sector_etfs_iv_snapshot.json"
+  
+  major_indices:
+    snapshot: "major_indices_iv_snapshot.json"
+  
+  vix:
+    snapshot: "vix_options_snapshot.json"

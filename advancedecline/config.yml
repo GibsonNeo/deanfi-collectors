@@ -1,0 +1,34 @@
+# Configuration for Market Breadth (Advance/Decline) Data
+
+# Data source
+data_source: "Yahoo Finance (yfinance)"
+
+# Market universe
+universe: "S&P 500"
+universe_description: "S&P 500 index constituents (approximately 500 stocks)"
+
+# Historical data settings
+historical_lookback_days: 365  # One year of historical data for A/D line and MA tracking
+
+# yfinance download settings
+# Need 2 years to calculate 200-day MA going back 1 year (200 days lookback + 365 days history)
+download_period: "2y"  # Download 2 years of data for calculations
+batch_size: 100  # Number of tickers to download at once (to avoid rate limits)
+batch_delay_seconds: 1  # Delay between batches
+
+# Calculation parameters
+moving_averages:
+  - 20   # 20-day moving average (short-term trend)
+  - 50   # 50-day moving average (intermediate trend)
+  - 200  # 200-day moving average (long-term trend)
+
+# 52-week high/low threshold
+new_high_threshold: 0.99  # Stock within 1% of 52-week high
+new_low_threshold: 1.01   # Stock within 1% of 52-week low
+
+# Output files
+output_files:
+  daily_breadth: "daily_breadth.json"
+  ad_line_historical: "ad_line_historical.json"
+  ma_percentage_historical: "ma_percentage_historical.json"
+  highs_lows_historical: "highs_lows_historical.json"

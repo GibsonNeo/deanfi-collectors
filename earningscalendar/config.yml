@@ -1,0 +1,46 @@
+# Earnings Calendar Configuration
+# Fetches historical and upcoming earnings release dates with EPS and Revenue data
+
+# Finnhub API Configuration
+# Get your API key at: https://finnhub.io/dashboard
+#
+# For local development: Set FINNHUB_API_KEY environment variable
+# For GitHub Actions: Set FINNHUB_API_KEY in repository secrets
+
+api:
+  # API key loaded from environment variable (not hardcoded for security)
+  # Set via: export FINNHUB_API_KEY="your_key_here"
+  finnhub_api_key: "${FINNHUB_API_KEY}"
+  base_url: "https://finnhub.io/api/v1"
+  
+# Rate Limiting
+rate_limiting:
+  calls_per_minute: 60
+  delay_between_calls: 1.0  # seconds
+  sliding_window_size: 60   # seconds
+
+# Date Range Configuration
+# Free tier provides 1 month of historical earnings
+date_range:
+  # Lookback period in days from today
+  historical_days: 30
+  
+  # Forward-looking period in days from today
+  future_days: 30
+  
+  # Or specify exact dates (YYYY-MM-DD format)
+  # If both are set, exact dates take precedence
+  from_date: null  # e.g., "2025-11-01"
+  to_date: null    # e.g., "2025-12-31"
+
+# Output Configuration
+output:
+  earnings_calendar_file: "earnings_calendar.json"
+  
+# Timing Classification
+# Classify when earnings are announced
+timing:
+  bmo: "Before Market Open"
+  amc: "After Market Close"
+  dmh: "During Market Hours"
+  unknown: "Time Not Specified"
