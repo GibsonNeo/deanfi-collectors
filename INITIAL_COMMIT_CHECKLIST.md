@@ -80,7 +80,7 @@ git push origin main
 Once pushed, configure secrets in GitHub:
 - [ ] Go to: Settings → Secrets and variables → Actions
 - [ ] Add secret: `FINNHUB_API_KEY` (your NEW Finnhub key)
-- [ ] Add secret: `GITHUB_PAT` (for pushing to deanfi-data repo)
+- [ ] Add secret: `DATA_REPO_TOKEN` (for pushing to deanfi-data repo)
 
 ### 5. Create deanfi-data Repository
 - [ ] Create new public repository: `deanfi-data`

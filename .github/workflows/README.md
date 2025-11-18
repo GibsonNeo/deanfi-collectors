@@ -23,7 +23,7 @@ Set these up in: **Settings → Secrets and variables → Actions**
 - **Used by:** `daily-news.yml`, `analyst-trends.yml`, `earnings.yml`
 - **Rate limits:** 60 calls/minute on free tier
 
-### GITHUB_PAT
+### DATA_REPO_TOKEN
 - **Get it:** [https://github.com/settings/tokens](https://github.com/settings/tokens)
 - **Permissions needed:** `repo` (Full control of private repositories)
 - **Used by:** All workflows (for pushing to deanfi-data repo)
@@ -38,7 +38,7 @@ Set these up in: **Settings → Secrets and variables → Actions**
 4. Expiration: 90 days (or custom)
 5. Select scopes: `repo`
 6. Generate token and copy it
-7. Add to repository secrets as `GITHUB_PAT`
+7. Add to repository secrets as `DATA_REPO_TOKEN`
 
 ## 🚀 Manual Triggers
 
@@ -144,7 +144,7 @@ cron: '0 17 * * 0'
 
 1. **Check the Actions tab** for error messages
 2. **Common issues:**
-   - Missing or invalid secrets (FINNHUB_API_KEY, GITHUB_PAT)
+   - Missing or invalid secrets (FINNHUB_API_KEY, DATA_REPO_TOKEN)
    - API rate limits exceeded
    - Network timeouts
    - Python script errors
@@ -238,7 +238,7 @@ on:
 env:
   FINNHUB_API_KEY: ${{ secrets.FINNHUB_API_KEY }}
   DATA_REPO: GibsonNeo/deanfi-data
-  GITHUB_PAT: ${{ secrets.GITHUB_PAT }}
+  DATA_REPO_TOKEN: ${{ secrets.DATA_REPO_TOKEN }}
 
 jobs:
   fetch-and-publish:
@@ -252,7 +252,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: ${{ env.DATA_REPO }}
-          token: ${{ secrets.GITHUB_PAT }}
+          token: ${{ secrets.DATA_REPO_TOKEN }}
           path: data-cache
       
       - name: Set up Python

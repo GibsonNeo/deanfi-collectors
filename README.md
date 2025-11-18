@@ -127,7 +127,7 @@ This repository uses GitHub Actions to automatically collect data and publish to
 
 1. **Create secrets** in repository settings:
    - `FINNHUB_API_KEY` - Your Finnhub API key
-   - `GITHUB_PAT` - Personal access token with `repo` scope
+   - `DATA_REPO_TOKEN` - Personal access token with `repo` scope
 
 2. **Enable Actions** in Settings → Actions → General
 
