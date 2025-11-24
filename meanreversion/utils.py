@@ -424,7 +424,7 @@ def save_json(data: Dict, filepath: str, indent: int = 2):
 
 
 def create_metadata(
-    indices_count: int,
+    etfs_count: int,
     data_source: str = "Yahoo Finance (yfinance)",
     description: str = ""
 ) -> Dict:
@@ -432,7 +432,7 @@ def create_metadata(
     Create metadata section for JSON output.
     
     Args:
-        indices_count: Number of indices tracked
+        etfs_count: Number of ETFs tracked
         data_source: Data source description
         description: Additional description
     
