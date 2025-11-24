@@ -70,8 +70,8 @@ jobs:
           git config user.name "GitHub Actions Bot"
           git config user.email "actions@github.com"
           
-          # Add all JSON files in meanreversion directory
-          git add meanreversion/*.json
+          # Add all JSON files in meanreversion directory and cache
+          git add meanreversion/*.json cache/
           
           # Check if there are changes to commit
           if git diff --staged --quiet; then
