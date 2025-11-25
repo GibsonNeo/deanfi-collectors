@@ -160,7 +160,7 @@ INFLATION_PRICES_INDICATORS = [
         frequency="Monthly",
         seasonal_adjustment="SA",
         unit="Index 1982-84=100",
-        interpretation="neutral"  # Context-dependent
+        interpretation="lower_is_better"  # Lower inflation is generally favorable
     ),
     IndicatorDefinition(
         series_id="CPILFESL",
@@ -169,7 +169,7 @@ INFLATION_PRICES_INDICATORS = [
         frequency="Monthly",
         seasonal_adjustment="SA",
         unit="Index 1982-84=100",
-        interpretation="neutral"
+        interpretation="lower_is_better"
     ),
     IndicatorDefinition(
         series_id="PCEPI",
@@ -178,7 +178,7 @@ INFLATION_PRICES_INDICATORS = [
         frequency="Monthly",
         seasonal_adjustment="SA",
         unit="Index 2017=100",
-        interpretation="neutral"
+        interpretation="lower_is_better"
     ),
     IndicatorDefinition(
         series_id="PCEPILFE",
@@ -187,7 +187,7 @@ INFLATION_PRICES_INDICATORS = [
         frequency="Monthly",
         seasonal_adjustment="SA",
         unit="Index 2017=100",
-        interpretation="neutral"
+        interpretation="lower_is_better"
     ),
     IndicatorDefinition(
         series_id="PPIACO",
@@ -196,7 +196,7 @@ INFLATION_PRICES_INDICATORS = [
         frequency="Monthly",
         seasonal_adjustment="NSA",
         unit="Index 1982=100",
-        interpretation="neutral"
+        interpretation="lower_is_better"
     ),
     IndicatorDefinition(
         series_id="T5YIE",
@@ -205,7 +205,7 @@ INFLATION_PRICES_INDICATORS = [
         frequency="Daily",
         seasonal_adjustment="NSA",
         unit="Percent",
-        interpretation="neutral"
+        interpretation="lower_is_better"
     ),
     IndicatorDefinition(
         series_id="CPIENGSL",
@@ -214,7 +214,7 @@ INFLATION_PRICES_INDICATORS = [
         frequency="Monthly",
         seasonal_adjustment="SA",
         unit="Index 1982-84=100",
-        interpretation="neutral"
+        interpretation="lower_is_better"
     ),
 ]
 
