@@ -23,6 +23,7 @@ from economy_compute import (
     calculate_grade,
     calculate_overall_grade,
     calculate_trend,
+    is_trend_favorable,
     calculate_change_metrics,
     adaptive_resample,
     sanitize_for_json

@@ -1,9 +1,11 @@
-name: Growth & Output Collection
+name: Economy Indicators Collection
 
 on:
   schedule:
+    # Every weekday at 8:00am ET (13:00 UTC during EST, 12:00 UTC during EDT)
+    - cron: '0 13 * * 1-5'
+    # - cron: '0 12 * * 1-5'  # EDT (Daylight Saving Time)
     # Every weekday at 12:00pm ET (17:00 UTC during EST, 16:00 UTC during EDT)
-    # Note: Currently set for EST (Standard Time). When DST begins, uncomment line below and comment line above.
     - cron: '0 17 * * 1-5'
     # - cron: '0 16 * * 1-5'  # EDT (Daylight Saving Time)
   workflow_dispatch:
@@ -17,9 +19,9 @@ jobs:
   fetch-and-publish:
     runs-on: ubuntu-latest
     
-    # Prevent concurrent runs to avoid git push conflicts
+    # Queue all data collectors to prevent git conflicts when writing to deanfi-data repo
     concurrency:
-      group: deanfi-data-write
+      group: deanfi-data-repo
       cancel-in-progress: false
     
     steps:
@@ -48,11 +50,32 @@ jobs:
           python fetch_growth_output.py
           echo "✅ Growth & output data fetched"
       
+      - name: Fetch inflation & prices data
+        run: |
+          cd inflationprices
+          python fetch_inflation_prices.py
+          echo "✅ Inflation & prices data fetched"
+      
+      - name: Fetch labor & employment data
+        run: |
+          cd laboremployment
+          python fetch_labor_employment.py
+          echo "✅ Labor & employment data fetched"
+      
+      - name: Fetch money markets data
+        run: |
+          cd moneymarkets
+          python fetch_money_markets.py
+          echo "✅ Money markets data fetched"
+      
       - name: Copy to data repo
         run: |
           mkdir -p data-cache/economy-breadth
           cp growthoutput/growth_output.json data-cache/economy-breadth/
-          echo "✅ Files copied to data repo"
+          cp inflationprices/inflation_prices.json data-cache/economy-breadth/
+          cp laboremployment/labor_employment.json data-cache/economy-breadth/
+          cp moneymarkets/money_markets.json data-cache/economy-breadth/
+          echo "✅ All economy files copied to data repo"
       
       - name: Commit and push
         run: |
@@ -64,8 +87,8 @@ jobs:
           if git diff --staged --quiet; then
             echo "No changes to commit"
           else
-            git commit -m "chore: update growth & output data - $(date -u +"%Y-%m-%d")"
+            git commit -m "chore: update economy indicators - $(date -u +"%Y-%m-%d")"
             git pull --rebase origin main
             git push
-            echo "✅ Data pushed to repository"
+            echo "✅ Economy data pushed to repository"
           fi
