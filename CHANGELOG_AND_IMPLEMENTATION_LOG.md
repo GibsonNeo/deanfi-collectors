@@ -5,6 +5,56 @@ This document tracks all implementations, changes, and updates to the DeanFi Col
 
 # DeanFi Collectors - Changelog and Implementation Log
 
+## 2025-12-07: SP100 Growth Collector - Fixed EPS YoY Calculation Edge Cases
+
+### Summary
+Fixed misleading EPS YoY percentage calculations when dealing with negative earnings. The previous calculation could show +7580% growth for INTC when the company's losses actually worsened (from -$0.05 to -$3.84).
+
+### Problem
+YoY percentage formula `(current / prior) - 1` produces misleading results when EPS is negative:
+- INTC: -$3.84 from -$0.05 calculated as +7580% (mathematically correct but misleading - loss worsened)
+- Negative-to-positive transitions produce confusing negative percentages
+- The "Top EPS Grower" leaderboard was showing companies with severe losses
+
+### Solution
+Updated YoY calculation functions to only compute EPS percentages when **both** current and prior values are positive:
+- `calculate_yoy_growth()`: Added `is_eps` parameter; returns `None` when either value is negative
+- `calculate_ttm_yoy()`: Added `is_eps` parameter; returns `None` when either TTM sum is negative
+- Annual fallback calculation: Same logic applied
+- Extreme values still capped at ±999.99% to prevent display issues
+
+### Files Changed
+- `sp100growth/fetch_sp100_growth.py`:
+  - Updated `calculate_yoy_growth()` function signature and logic
+  - Updated `calculate_ttm_yoy()` function signature and logic  
+  - Updated annual fallback TTM YoY calculation
+  - Updated all callers to pass `is_eps=True` for EPS calculations
+
+### Results
+| Metric | Before | After |
+|--------|--------|-------|
+| Companies with EPS YoY | 100 | 93 |
+| Top EPS Grower | INTC +7580% (misleading) | GILD +1000% (legitimate) |
+| INTC EPS YoY | +7580% | None (excluded - negative EPS) |
+| BA EPS YoY | Large positive | None (excluded - negative EPS) |
+
+### Companies Now Excluded from EPS YoY (7 total)
+Companies with negative EPS in current or prior TTM period:
+- BA (Boeing): Current EPS -$18.19
+- CVS: Current EPS -$0.85
+- INTC: Current EPS -$3.84
+- Plus 4 others with negative prior-year EPS
+
+### Rationale
+For a financial website, showing percentage growth only makes sense when:
+1. Both periods are profitable (positive EPS)
+2. The percentage represents meaningful improvement
+3. Users can intuitively understand "higher % = better performance"
+
+When EPS is negative, users should look at the actual EPS value, not a misleading percentage.
+
+---
+
 ## 2025-12-07: SP100 Growth Collector - Added Sector Field to Output
 
 ### Summary

@@ -1553,8 +1553,25 @@ def extract_concept_values(
 # Growth Calculations
 # ============================================================================
 
-def calculate_yoy_growth(values: List[Optional[float]]) -> Dict[str, Optional[float]]:
-    """Calculate YoY growth for consecutive periods."""
+def calculate_yoy_growth(values: List[Optional[float]], is_eps: bool = False) -> Dict[str, Optional[float]]:
+    """
+    Calculate YoY growth for consecutive periods.
+    
+    Returns percentage change as a decimal (0.10 = 10%).
+    
+    Args:
+        values: List of metric values (most recent first)
+        is_eps: If True, applies stricter rules for EPS (skips when either value is negative)
+    
+    Edge case handling:
+    - Returns None when prior value is zero (division by zero)
+    - Caps extreme values at ±9.9999 (±999.99%) for very large swings
+    - For EPS (is_eps=True): Returns None if either value is negative
+      (percentage math produces confusing/misleading results with negative earnings)
+    """
+    # Maximum absolute YoY value (999.99%)
+    MAX_YOY = 9.9999
+    
     result = {}
     for i in range(len(values) - 1):
         cur = values[i]
@@ -1563,7 +1580,19 @@ def calculate_yoy_growth(values: List[Optional[float]]) -> Dict[str, Optional[fl
         year_label = f"period_{i}"
         
         if cur is not None and prev is not None and prev != 0:
-            result[year_label] = round((cur / prev) - 1, 4)
+            # For EPS: skip if either value is negative (math gets confusing)
+            if is_eps and (cur < 0 or prev < 0):
+                result[year_label] = None
+                continue
+            
+            yoy = (cur / prev) - 1
+            
+            # Cap extreme values
+            if yoy > MAX_YOY:
+                yoy = MAX_YOY
+            elif yoy < -MAX_YOY:
+                yoy = -MAX_YOY
+            result[year_label] = round(yoy, 4)
         else:
             result[year_label] = None
     
@@ -1617,11 +1646,25 @@ def calculate_ttm(quarters: List[QuarterlyRecord], metric: str) -> Optional[floa
     return sum(vals)
 
 
-def calculate_ttm_yoy(quarters: List[QuarterlyRecord], metric: str) -> Optional[float]:
+def calculate_ttm_yoy(quarters: List[QuarterlyRecord], metric: str, is_eps: bool = False) -> Optional[float]:
     """
     Calculate TTM YoY growth.
     Compares sum of quarters 0-3 (most recent TTM) to sum of quarters 4-7 (prior TTM).
+    
+    Args:
+        quarters: List of quarterly records (most recent first)
+        metric: The metric to calculate ('revenue' or 'eps_diluted')
+        is_eps: If True, returns None when either TTM sum is negative
+    
+    Edge case handling:
+    - Returns None when prior TTM is zero (division by zero)
+    - Caps extreme values at ±9.9999 (±999.99%)
+    - For EPS (is_eps=True): Returns None if either TTM is negative
+      (percentage math produces confusing/misleading results with negative earnings)
     """
+    # Maximum absolute YoY value (999.99%)
+    MAX_YOY = 9.9999
+    
     if len(quarters) < 8:
         return None
     
@@ -1646,7 +1689,19 @@ def calculate_ttm_yoy(quarters: List[QuarterlyRecord], metric: str) -> Optional[
     if prior_sum == 0:
         return None
     
-    return round((current_sum / prior_sum) - 1, 4)
+    # For EPS: skip if either TTM is negative (math gets confusing)
+    if is_eps and (current_sum < 0 or prior_sum < 0):
+        return None
+    
+    yoy = (current_sum / prior_sum) - 1
+    
+    # Cap extreme values
+    if yoy > MAX_YOY:
+        yoy = MAX_YOY
+    elif yoy < -MAX_YOY:
+        yoy = -MAX_YOY
+    
+    return round(yoy, 4)
 
 
 # ============================================================================
@@ -1947,8 +2002,8 @@ def extract_company_data(
     revenues = [a.revenue for a in annual_data]
     eps_values = [a.eps_diluted for a in annual_data]
     
-    revenue_yoy = calculate_yoy_growth(revenues)
-    eps_yoy = calculate_yoy_growth(eps_values)
+    revenue_yoy = calculate_yoy_growth(revenues, is_eps=False)
+    eps_yoy = calculate_yoy_growth(eps_values, is_eps=True)
     
     # Relabel with actual years
     def relabel_yoy(yoy_dict: dict, records: List[AnnualRecord]) -> Dict[str, Optional[float]]:
@@ -1968,8 +2023,8 @@ def extract_company_data(
     if len(quarterly_data) >= 4:
         ttm_revenue = calculate_ttm(quarterly_data, "revenue")
         ttm_eps = calculate_ttm(quarterly_data, "eps_diluted")
-        ttm_revenue_yoy = calculate_ttm_yoy(quarterly_data, "revenue")
-        ttm_eps_yoy = calculate_ttm_yoy(quarterly_data, "eps_diluted")
+        ttm_revenue_yoy = calculate_ttm_yoy(quarterly_data, "revenue", is_eps=False)
+        ttm_eps_yoy = calculate_ttm_yoy(quarterly_data, "eps_diluted", is_eps=True)
         
         # Determine source
         sources = set(q.source for q in quarterly_data[:4])
@@ -1991,12 +2046,22 @@ def extract_company_data(
         )
     elif annual_data:
         # Fallback: use most recent annual as TTM approximation
+        # Maximum absolute YoY value (999.99%)
+        MAX_YOY = 9.9999
+        
         ttm_revenue_yoy = None
         ttm_eps_yoy = None
-        if len(revenues) >= 2 and revenues[0] is not None and revenues[1] is not None and revenues[1] != 0:
-            ttm_revenue_yoy = round((revenues[0] / revenues[1]) - 1, 4)
-        if len(eps_values) >= 2 and eps_values[0] is not None and eps_values[1] is not None and eps_values[1] != 0:
-            ttm_eps_yoy = round((eps_values[0] / eps_values[1]) - 1, 4)
+        
+        # Revenue YoY (revenue is always positive, so just cap extremes)
+        if len(revenues) >= 2 and revenues[0] is not None and revenues[1] is not None and revenues[1] > 0:
+            yoy = (revenues[0] / revenues[1]) - 1
+            ttm_revenue_yoy = round(max(-MAX_YOY, min(MAX_YOY, yoy)), 4)
+        
+        # EPS YoY (only calculate when both values are positive to avoid confusing percentages)
+        if len(eps_values) >= 2 and eps_values[0] is not None and eps_values[1] is not None:
+            if eps_values[0] >= 0 and eps_values[1] > 0:
+                yoy = (eps_values[0] / eps_values[1]) - 1
+                ttm_eps_yoy = round(max(-MAX_YOY, min(MAX_YOY, yoy)), 4)
         
         ttm = TTMMetrics(
             revenue=revenues[0] if revenues else None,
