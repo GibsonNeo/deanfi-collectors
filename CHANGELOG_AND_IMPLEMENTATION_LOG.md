@@ -5,98 +5,158 @@ This document tracks all implementations, changes, and updates to the DeanFi Col
 
 # DeanFi Collectors - Changelog and Implementation Log
 
-## 2025-12-07: SP100 Growth Collector - 3-Source Consensus Validation
+## 2025-12-07: SP100 Growth Collector - Annual Data Quality Fixes
 
 ### Summary
-Upgraded from tiered fallback validation to consensus-based validation using 3 sources (yfinance, Alpha Vantage, FMP). Now all three sources are queried upfront and consensus voting determines the final value. This provides higher confidence validation for all fallback data.
+Fixed multiple data quality issues that were causing null CAGR values:
+1. Alpha Vantage TTM records leaking into annual data
+2. SEC quarterly values passing annual filter
+3. Fallback not triggering when SEC data is incomplete
 
-### Previous Approach (Tiered)
-- yfinance and Alpha Vantage queried first
-- If values within 5%: "validated"
-- If values 5-10% apart: "averaged"
-- If values >10% apart: Call FMP as tiebreaker, "validated_by_fmp"
+### Changes
 
-### New Approach (Consensus)
-- All 3 sources (yfinance, Alpha Vantage, FMP) queried upfront
-- If 2+ sources agree (within 5%): Use consensus value, "validated"
-- If all 3 differ: Average all 3, "discrepancy"
-- With ~100 tickers, uses ~100 FMP calls/day (well under 250/day limit)
+#### 1. Filter Alpha Vantage TTM Records
+**Problem**: Alpha Vantage's `EARNINGS` endpoint returns TTM/LTM values (e.g., `2025-09-30` with `eps=16.56`) that were being treated as annual data. These records have EPS but no revenue, causing `revenue[0] = None` and breaking CAGR calculations.
+
+**Fix**: Filter out Alpha Vantage records where revenue is NULL:
+```python
+# alphavantage_annual_financials()
+df = df[df["revenue"].notna()].copy()
+```
+
+#### 2. Validate Annual Period Duration
+**Problem**: SEC EDGAR includes restated quarterly values in 10-K filings (e.g., `end=2020-09-30, form=10-K, fp=FY`). These pass the `is_annual_10k()` filter based on form/fp but are actually quarterly periods.
+
+**Fix**: Updated `is_annual_10k()` to also validate period duration:
+```python
+def is_annual_10k(row: dict) -> bool:
+    # Must be 10-K form with FY fiscal period
+    if not (form.startswith("10-K") and (fp in ("FY", "") or fp.startswith("Q4"))):
+        return False
+    
+    # Additionally check period duration (start to end)
+    # Annual reports should cover ~12 months (at least 300 days)
+    start, end = row.get("start"), row.get("end")
+    if start and end:
+        days = (end_dt - start_dt).days
+        if days < 300:  # Must be at least 300 days
+            return False
+    return True
+```
+
+#### 3. Trigger Fallback for Missing Years
+**Problem**: Fallback logic only triggered when `annual_data` had null values or was empty. If SEC only had 3 years of complete data (like BLK), fallback wasn't triggered to add more years.
+
+**Fix**: Added `need_more_years` check:
+```python
+need_more_years = len(annual_data) < config.years_to_fetch
+need_annual_fallback = (annual_null_revenue > 0 or annual_null_eps > 0 or 
+                        len(annual_data) == 0 or need_more_years)
+```
+
+### Results
+| Metric | Before | After | Improvement |
+|--------|--------|-------|-------------|
+| Total Nulls | 65 | 28 | 57% reduction |
+| revenue_cagr_3yr | 7 | 0 | 100% fixed |
+| revenue_cagr_5yr | 13 | 2 | 85% fixed |
+| eps_cagr_3yr | 9 | 7 | 22% fixed |
+| eps_cagr_5yr | 12 | 14 | +2 (more data fetched) |
+| ttm.revenue_yoy | 2 | 2 | unchanged |
+| ttm.eps_yoy | 3 | 3 | unchanged |
+
+### Remaining Nulls (28 total)
+Most remaining nulls are structural (genuine data unavailability):
+- `revenue_cagr_5yr`: 2 (TSLA, USB - likely rate limit during bulk extraction)
+- `eps_cagr_3yr`: 7 (AIG, BA, BMY, GE, INTC, PLTR, UBER - volatile earnings)
+- `eps_cagr_5yr`: 14 (various - negative or zero EPS in base year)
+- `ttm.revenue_yoy`: 2 (BLK, GOOGL - quarterly data gaps)
+- `ttm.eps_yoy`: 3 (BLK, BRK-B, V - quarterly EPS gaps)
+
+---
+
+## 2025-12-07: SP100 Growth Collector - Simplified Fallback with yfinance Priority
+
+### Summary
+Simplified the fallback logic to use yfinance as the primary fallback source and Alpha Vantage as secondary. FMP (Financial Modeling Prep) is now optional and disabled by default due to API rate limits (250 calls/day).
+
+### Changes from Previous (3-Source Consensus)
+The previous approach used all 3 sources (yfinance, Alpha Vantage, FMP) for consensus voting. This was changed because:
+1. FMP has a 250 calls/day limit on the free tier
+2. Running the collector multiple times exhausts the API quota
+3. yfinance and Alpha Vantage provide sufficient coverage
+
+### New Approach (Priority-Based)
+- **SEC EDGAR**: Primary source (no change)
+- **yfinance**: First fallback (free, no API limits)
+- **Alpha Vantage**: Second fallback (when yfinance fails)
+- **FMP**: Optional third source (disabled by default)
+
+### Fallback Logic
+```python
+def get_fallback_value(year_date, all_sources, metric):
+    """
+    Get value using priority order: yfinance > alphavantage > fmp
+    
+    Status:
+    - single_source: Only one source has data
+    - validated: Multiple sources agree within 5%
+    - discrepancy: Sources disagree >5% (uses primary source value)
+    """
+```
+
+### Quarterly Fallback
+- **yfinance**: Primary quarterly fallback (free)
+- **Finnhub**: Secondary quarterly fallback (when yfinance fails)
+
+This enables TTM calculations for tickers like GOOGL (Q1 2025 revenue), V (quarterly EPS), and others where SEC EDGAR quarterly data is incomplete.
 
 ### Changes Made
 
 #### sp100growth/fetch_sp100_growth.py
 
-**Updated validate_across_sources() - Consensus-Based Logic:**
+**Added yfinance_quarterly_financials():**
 ```python
-def validate_across_sources(source_values, tolerance_pct=5.0):
+def yfinance_quarterly_financials(symbol: str, quarters_to_fetch: int = 8) -> pd.DataFrame:
     """
-    Cross-validate a value using consensus-based voting.
-    
-    Logic:
-    - If 2+ sources agree (within tolerance): Use the consensus value, status = "validated"
-    - If all sources differ: Average all values, status = "discrepancy"
-    - If only 1 source: Use that value, status = "single_source"
+    Fetch quarterly revenue and EPS from Yahoo Finance.
+    Key fallback for quarterly data when SEC EDGAR is missing values.
     """
-    # Check all pairs to find consensus groups
-    for i, (name1, val1) in enumerate(valid_sources.items()):
-        matching_sources = [name1]
-        for j, (name2, val2) in enumerate(valid_sources.items()):
-            if i != j and _values_match(val1, val2, tolerance_pct):
-                matching_sources.append(name2)
-        
-        if len(matching_sources) >= 2:
-            # Consensus found - use average of matching values
-            return ValidationResult(value=consensus_value, status="validated", ...)
-    
-    # No consensus - all differ, average and flag
-    return ValidationResult(value=avg_value, status="discrepancy", ...)
 ```
 
-**Updated gather_all_fallback_data():**
-Now includes FMP as a primary source alongside yfinance and Alpha Vantage (Finnhub reserved for quarterly fallback only).
+**Updated quarterly fallback logic:**
+- Now tries yfinance first, then Finnhub
+- Triggers fallback if ANY quarter has null data (not just when <4 quarters have data)
+- Enables TTM calculations for more tickers
 
-**Removed resolve_discrepancy_with_fmp():**
-No longer needed since FMP is gathered upfront with other sources.
+**Simplified gather_all_fallback_data():**
+FMP is now optional and at the end of priority list.
+
+**Added get_fallback_value():**
+Simple priority-based value selection with discrepancy tracking.
 
 #### sp100growth/config.yml
 ```yaml
-# Financial Modeling Prep (FMP) - Primary validation source for annual fallback data.
-# Used alongside yfinance and Alpha Vantage for 3-source consensus validation.
-# With ~100 tickers in SP100, this uses ~100 calls/day (well under 250/day limit).
-# Consensus logic: 2+ sources agree = validated, all differ = discrepancy (averaged)
+# FMP is optional - disabled by default due to 250 calls/day limit
 fmp:
-  enabled: true
+  enabled: false
 ```
 
-### Validation Status Meanings (Simplified)
-- **validated**: 2+ sources agree within 5% tolerance (high confidence)
-- **discrepancy**: All sources differ >5% (averaged, needs review)
-- **single_source**: Only one fallback source had data
+### Results
+- **65 null values** across SP100 (down from 250+ before multi-source fallback)
+- Stable operation without FMP dependency
+- Quarterly fallback fills gaps in TTM calculations
 
-Note: "validated_by_fmp" and "averaged" statuses are no longer used - replaced by simpler consensus logic.
-
-### Benefits
-1. **Higher confidence**: 2-out-of-3 consensus is more reliable than pairwise comparison
-2. **Simpler logic**: No tiered tolerance levels (5%, 10%, etc.)
-3. **Clearer output**: Either sources agree ("validated") or they don't ("discrepancy")
-4. **Same API usage**: ~100 calls/day for ~100 tickers (well under FMP's 250/day)
-
-### Example Output
-```json
-{
-  "fiscal_year_end": "2025-09-30",
-  "eps_diluted": 10.2,
-  "eps_concept": "fallback:yfinance,alphavantage,fmp",
-  "eps_validation": "validated",
-  "eps_sources": ["yfinance", "alphavantage", "fmp"],
-  "eps_discrepancy_pct": 5.8
-}
-```
-In this example, 2 of 3 sources agreed within 5%, so the consensus value is used and marked "validated".
+### Remaining Nulls Analysis
+Most remaining nulls are structural (not data availability):
+- `revenue_cagr_5yr`: 13 tickers - need 6 years of data
+- `eps_cagr_5yr`: 12 tickers - need 6 years of data
+- `revenue_yoy.2020`: 6 tickers - historical data gaps
+- `ttm.eps_yoy`: 3 tickers - quarterly EPS gaps (BLK, BRK-B, V)
 
 ---
 
-## 2025-12-07 (Earlier): SP100 Growth Collector - FMP Tiebreaker (Superseded)
+## 2025-12-07 (Earlier): SP100 Growth Collector - 3-Source Consensus Validation (Superseded)
 
 ---
 

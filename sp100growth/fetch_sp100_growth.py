@@ -409,32 +409,33 @@ def gather_all_fallback_data(
     years_to_fetch: int = 6
 ) -> Dict[str, pd.DataFrame]:
     """
-    Fetch data from ALL available fallback sources for consensus-based validation.
+    Fetch data from fallback sources in priority order.
     
-    Sources (in order):
-    - yfinance: Free, no API key required
-    - Alpha Vantage: Requires ALPHA_VANTAGE_API_KEY
-    - FMP (Financial Modeling Prep): Requires FMP_API_KEY (250 calls/day limit)
+    Priority order:
+    1. yfinance: Free, no API key required (primary fallback)
+    2. Alpha Vantage: Requires ALPHA_VANTAGE_API_KEY (secondary fallback)
     
-    Note: Finnhub is reserved for quarterly fallback only.
+    FMP is disabled by default due to API limits (250 calls/day).
+    Finnhub is reserved for quarterly fallback only.
     
     Returns dict mapping source name to DataFrame with columns: end, revenue, eps_diluted
     """
     all_sources = {}
     
-    # yfinance (always try - no API key needed)
+    # yfinance (primary fallback - free, no API key needed)
     if config.yfinance_enabled:
         yf_df = yfinance_annual_financials(ticker, years_to_fetch)
         if not yf_df.empty:
             all_sources["yfinance"] = yf_df
     
-    # Alpha Vantage
+    # Alpha Vantage (secondary fallback)
     if config.alphavantage_enabled and config.alphavantage_api_key:
         av_df = alphavantage_annual_financials(ticker, config.alphavantage_api_key, years_to_fetch)
         if not av_df.empty:
             all_sources["alphavantage"] = av_df
     
-    # FMP (Financial Modeling Prep) - primary validation source
+    # FMP is optional - disabled by default due to 250 calls/day limit
+    # Only enable if you have a premium FMP account
     if config.fmp_enabled and config.fmp_api_key:
         fmp_df = fmp_annual_financials(ticker, config.fmp_api_key, years_to_fetch)
         if not fmp_df.empty:
@@ -443,27 +444,32 @@ def gather_all_fallback_data(
     return all_sources
 
 
-def cross_validate_fallback_year(
+def get_fallback_value(
     year_date: str,
     all_sources: Dict[str, pd.DataFrame],
     metric: str,  # "revenue" or "eps_diluted"
-    tolerance_pct: float = 5.0
 ) -> ValidationResult:
     """
-    Cross-validate a specific year/metric across all fallback sources.
+    Get a value from fallback sources using priority order.
+    
+    Priority: yfinance > alphavantage > fmp
+    
+    If only one source has data, use it (status = "single_source").
+    If multiple sources have data and agree (within 5%), use yfinance (status = "validated").
+    If multiple sources disagree (>5% diff), use yfinance but flag as "discrepancy".
     
     Args:
         year_date: Fiscal year end date (e.g., "2024-12-31")
         all_sources: Dict from gather_all_fallback_data()
         metric: "revenue" or "eps_diluted"
-        tolerance_pct: Tolerance for considering values validated
     
     Returns:
-        ValidationResult with cross-validated value
+        ValidationResult with value and status
     """
     year_prefix = year_date[:4]  # Extract year for fuzzy matching
     source_values = {}
     
+    # Collect values from all sources
     for source_name, df in all_sources.items():
         # Try exact match first
         match = df[df["end"] == year_date]
@@ -476,7 +482,74 @@ def cross_validate_fallback_year(
             if pd.notna(val):
                 source_values[source_name] = float(val)
     
-    return validate_across_sources(source_values, tolerance_pct)
+    if not source_values:
+        return ValidationResult(status="none")
+    
+    # Priority order for selecting the value
+    priority_order = ["yfinance", "alphavantage", "fmp"]
+    selected_source = None
+    selected_value = None
+    
+    for source in priority_order:
+        if source in source_values:
+            selected_source = source
+            selected_value = source_values[source]
+            break
+    
+    if selected_value is None:
+        return ValidationResult(status="none")
+    
+    # Determine validation status
+    source_names = list(source_values.keys())
+    
+    if len(source_values) == 1:
+        # Only one source has data
+        return ValidationResult(
+            value=selected_value,
+            status="single_source",
+            sources_compared=source_names,
+            source_values=source_values
+        )
+    
+    # Multiple sources - check if they agree
+    values = list(source_values.values())
+    max_val = max(values)
+    min_val = min(values)
+    discrepancy_pct = ((max_val - min_val) / max_val) * 100 if max_val > 0 else 0
+    
+    if discrepancy_pct <= 5.0:
+        # Sources agree - use primary source (yfinance)
+        return ValidationResult(
+            value=selected_value,
+            status="validated",
+            sources_compared=source_names,
+            source_values=source_values,
+            discrepancy_pct=round(discrepancy_pct, 2)
+        )
+    else:
+        # Sources disagree - use primary source but flag as discrepancy
+        return ValidationResult(
+            value=selected_value,
+            status="discrepancy",
+            sources_compared=source_names,
+            source_values=source_values,
+            discrepancy_pct=round(discrepancy_pct, 2)
+        )
+
+
+def cross_validate_fallback_year(
+    year_date: str,
+    all_sources: Dict[str, pd.DataFrame],
+    metric: str,  # "revenue" or "eps_diluted"
+    tolerance_pct: float = 5.0
+) -> ValidationResult:
+    """
+    Get a value from fallback sources with status tracking.
+    
+    This is a wrapper around get_fallback_value() for backward compatibility.
+    Uses yfinance as primary, Alpha Vantage as secondary.
+    """
+    return get_fallback_value(year_date, all_sources, metric)
 
 
 # ============================================================================
@@ -541,6 +614,78 @@ def yfinance_annual_financials(symbol: str, years_to_fetch: int = 6) -> pd.DataF
         
     except Exception as e:
         print(f"[warn] yfinance error for {symbol}: {e}")
+        return pd.DataFrame(columns=["end", "revenue", "eps_diluted", "source"])
+
+
+# ============================================================================
+# yfinance Fallback (Quarterly)
+# ============================================================================
+
+def yfinance_quarterly_financials(symbol: str, quarters_to_fetch: int = 8) -> pd.DataFrame:
+    """
+    Fetch quarterly revenue and EPS from Yahoo Finance.
+    Returns DataFrame with columns: end, revenue, eps_diluted, source
+    
+    This is a key fallback for quarterly data when SEC EDGAR is missing values.
+    yfinance provides quarterly data for most companies including:
+    - Revenue (Total Revenue)
+    - Diluted EPS
+    
+    Example companies that benefit: GOOGL, V (Visa), BRK-B
+    """
+    try:
+        import yfinance as yf
+    except ImportError:
+        print(f"[warn] yfinance not installed, skipping yfinance quarterly fallback")
+        return pd.DataFrame(columns=["end", "revenue", "eps_diluted", "source"])
+    
+    try:
+        ticker = yf.Ticker(symbol)
+        q_income = ticker.quarterly_income_stmt
+        
+        if q_income is None or q_income.empty:
+            return pd.DataFrame(columns=["end", "revenue", "eps_diluted", "source"])
+        
+        rows = []
+        for col in q_income.columns[:quarters_to_fetch]:
+            # col is a Timestamp for the fiscal quarter end
+            end_date = col.strftime("%Y-%m-%d")
+            
+            # Revenue - try multiple field names
+            revenue = None
+            for rev_field in ["Total Revenue", "Revenue", "Total Operating Revenue", "Gross Revenue"]:
+                if rev_field in q_income.index:
+                    val = q_income.loc[rev_field, col]
+                    if pd.notna(val):
+                        revenue = float(val)
+                        break
+            
+            # EPS Diluted - try multiple field names
+            eps = None
+            for eps_field in ["Diluted EPS", "Basic EPS", "EPS"]:
+                if eps_field in q_income.index:
+                    val = q_income.loc[eps_field, col]
+                    if pd.notna(val):
+                        eps = float(val)
+                        break
+            
+            if revenue is not None or eps is not None:
+                rows.append({
+                    "end": end_date,
+                    "revenue": revenue,
+                    "eps_diluted": eps,
+                    "source": "yfinance"
+                })
+        
+        if not rows:
+            return pd.DataFrame(columns=["end", "revenue", "eps_diluted", "source"])
+        
+        df = pd.DataFrame(rows)
+        df = df.sort_values("end", ascending=False).drop_duplicates("end", keep="first")
+        return df
+        
+    except Exception as e:
+        print(f"[warn] yfinance quarterly error for {symbol}: {e}")
         return pd.DataFrame(columns=["end", "revenue", "eps_diluted", "source"])
 
 
@@ -611,6 +756,12 @@ def alphavantage_annual_financials(symbol: str, api_key: str, years_to_fetch: in
     
     df = pd.DataFrame(list(rows.values()))
     df = df.sort_values("end", ascending=False).drop_duplicates("end", keep="first")
+    
+    # Filter out records where revenue is NULL - these are typically TTM/LTM values
+    # from the EARNINGS endpoint that don't have corresponding annual revenue data.
+    # This prevents phantom records like "2025-09-30" with EPS but no revenue.
+    df = df[df["revenue"].notna()].copy()
+    
     return df
 
 
@@ -745,10 +896,37 @@ def fmp_annual_financials(symbol: str, api_key: str, years_to_fetch: int = 6, ti
 # ============================================================================
 
 def is_annual_10k(row: dict) -> bool:
-    """Check if a row is from an annual 10-K filing."""
+    """
+    Check if a row is from an annual 10-K filing with full-year duration.
+    
+    This filters out restated quarterly values that appear in 10-K filings.
+    A true annual record should have a period duration of approximately 12 months
+    (at least 300 days to account for variations).
+    """
     form = str(row.get("form", "")).upper()
     fp = str(row.get("fp", "")).upper()
-    return form.startswith("10-K") and (fp in ("FY", "") or fp.startswith("Q4"))
+    
+    # Must be 10-K form with FY fiscal period
+    if not (form.startswith("10-K") and (fp in ("FY", "") or fp.startswith("Q4"))):
+        return False
+    
+    # Additionally check period duration (start to end)
+    # Annual reports should cover ~12 months (at least 300 days)
+    start = row.get("start")
+    end = row.get("end")
+    if start and end:
+        try:
+            from datetime import datetime
+            start_dt = datetime.strptime(start, "%Y-%m-%d")
+            end_dt = datetime.strptime(end, "%Y-%m-%d")
+            days = (end_dt - start_dt).days
+            # Must be at least 300 days (covers ~10-12 month fiscal years)
+            if days < 300:
+                return False
+        except:
+            pass
+    
+    return True
 
 
 def is_quarterly_10q(row: dict) -> bool:
@@ -1003,7 +1181,9 @@ def extract_company_data(
     # Count how many annual records have null revenue or EPS
     annual_null_revenue = sum(1 for a in annual_data if a.revenue is None)
     annual_null_eps = sum(1 for a in annual_data if a.eps_diluted is None)
-    need_annual_fallback = (annual_null_revenue > 0 or annual_null_eps > 0 or len(annual_data) == 0)
+    # Also need fallback if we don't have enough years of data
+    need_more_years = len(annual_data) < config.years_to_fetch
+    need_annual_fallback = (annual_null_revenue > 0 or annual_null_eps > 0 or len(annual_data) == 0 or need_more_years)
     
     if need_annual_fallback:
         # Gather data from ALL available fallback sources for consensus-based validation
@@ -1124,49 +1304,78 @@ def extract_company_data(
             source="sec",
         ))
     
-    # Fallback to Finnhub if SEC quarterly data is incomplete
-    sec_quarters_with_revenue = sum(1 for q in quarterly_data if q.revenue is not None)
-    sec_quarters_with_eps = sum(1 for q in quarterly_data if q.eps_diluted is not None)
+    # ========== QUARTERLY FALLBACK (yfinance first, then Finnhub) ==========
+    # Check if SEC quarterly data is incomplete for TTM calculation.
+    # We need the MOST RECENT 4 quarters to have both revenue and EPS for accurate TTM.
+    # Also trigger fallback if ANY quarter in the top 8 is missing data (helps CAGR calculations).
+    recent_4 = quarterly_data[:4] if len(quarterly_data) >= 4 else quarterly_data
+    recent_4_revenue = sum(1 for q in recent_4 if q.revenue is not None)
+    recent_4_eps = sum(1 for q in recent_4 if q.eps_diluted is not None)
     
-    need_finnhub = (sec_quarters_with_revenue < 4 or sec_quarters_with_eps < 4)
+    any_null_revenue = any(q.revenue is None for q in quarterly_data)
+    any_null_eps = any(q.eps_diluted is None for q in quarterly_data)
     
-    if need_finnhub and config.finnhub_enabled and config.finnhub_api_key:
-        finnhub_df = finnhub_quarterly_financials(ticker, config.finnhub_api_key)
+    # Trigger fallback if: most recent 4 quarters are incomplete OR any quarter has nulls
+    need_quarterly_fallback = (recent_4_revenue < 4 or recent_4_eps < 4 or any_null_revenue or any_null_eps)
+    quarterly_source = "sec"
+    
+    def merge_quarterly_fallback(df: pd.DataFrame, source_name: str):
+        """Helper to merge fallback data into quarterly_data."""
+        nonlocal quarterly_source
+        if df.empty:
+            return
         
-        if not finnhub_df.empty:
-            # Merge Finnhub data into quarterly records
-            fh_by_end = {}
-            for _, row in finnhub_df.iterrows():
-                end = row.get("end")
-                if end:
-                    fh_by_end[end] = row
-            
-            # Fill gaps in existing quarters
-            for q in quarterly_data:
-                fh_rec = fh_by_end.get(q.fiscal_quarter_end)
-                if fh_rec is not None:
-                    if q.revenue is None and pd.notna(fh_rec.get("revenue")):
-                        q.revenue = fh_rec["revenue"]
-                        q.source = "finnhub"
-                    if q.eps_diluted is None and pd.notna(fh_rec.get("eps_diluted")):
-                        q.eps_diluted = fh_rec["eps_diluted"]
-                        q.source = "finnhub"
-            
-            # Add any new quarters from Finnhub not in SEC
-            existing_ends = {q.fiscal_quarter_end for q in quarterly_data}
-            for end, row in fh_by_end.items():
-                if end not in existing_ends:
-                    quarterly_data.append(QuarterlyRecord(
-                        fiscal_quarter_end=end,
-                        revenue=row.get("revenue") if pd.notna(row.get("revenue")) else None,
-                        eps_diluted=row.get("eps_diluted") if pd.notna(row.get("eps_diluted")) else None,
-                        source="finnhub",
-                    ))
-            
-            # Re-sort and limit
-            quarterly_data.sort(key=lambda x: x.fiscal_quarter_end, reverse=True)
-            quarterly_data = quarterly_data[:config.quarters_to_fetch]
-            quarterly_source = "mixed"
+        # Build lookup by date
+        fb_by_end = {}
+        for _, row in df.iterrows():
+            end = row.get("end")
+            if end:
+                fb_by_end[end] = row
+        
+        # Fill gaps in existing quarters
+        for q in quarterly_data:
+            fb_rec = fb_by_end.get(q.fiscal_quarter_end)
+            if fb_rec is not None:
+                if q.revenue is None and pd.notna(fb_rec.get("revenue")):
+                    q.revenue = float(fb_rec["revenue"])
+                    q.source = source_name
+                    quarterly_source = "mixed"
+                if q.eps_diluted is None and pd.notna(fb_rec.get("eps_diluted")):
+                    q.eps_diluted = float(fb_rec["eps_diluted"])
+                    q.source = source_name
+                    quarterly_source = "mixed"
+        
+        # Add any new quarters not in SEC
+        existing_ends = {q.fiscal_quarter_end for q in quarterly_data}
+        for end, row in fb_by_end.items():
+            if end not in existing_ends:
+                quarterly_data.append(QuarterlyRecord(
+                    fiscal_quarter_end=end,
+                    revenue=float(row["revenue"]) if pd.notna(row.get("revenue")) else None,
+                    eps_diluted=float(row["eps_diluted"]) if pd.notna(row.get("eps_diluted")) else None,
+                    source=source_name,
+                ))
+                quarterly_source = "mixed"
+    
+    if need_quarterly_fallback:
+        # 1. Try yfinance first (free, no API key needed)
+        if config.yfinance_enabled:
+            yf_quarterly = yfinance_quarterly_financials(ticker, config.quarters_to_fetch)
+            merge_quarterly_fallback(yf_quarterly, "yfinance")
+        
+        # Recheck if still need fallback
+        current_revenue = sum(1 for q in quarterly_data if q.revenue is not None)
+        current_eps = sum(1 for q in quarterly_data if q.eps_diluted is not None)
+        still_need_fallback = (current_revenue < 4 or current_eps < 4)
+        
+        # 2. Try Finnhub if still incomplete
+        if still_need_fallback and config.finnhub_enabled and config.finnhub_api_key:
+            finnhub_df = finnhub_quarterly_financials(ticker, config.finnhub_api_key)
+            merge_quarterly_fallback(finnhub_df, "finnhub")
+        
+        # Re-sort and limit
+        quarterly_data.sort(key=lambda x: x.fiscal_quarter_end, reverse=True)
+        quarterly_data = quarterly_data[:config.quarters_to_fetch]
     
     # ========== GROWTH METRICS ==========
     revenues = [a.revenue for a in annual_data]

@@ -7,19 +7,26 @@ Extracts annual (10-K) and quarterly (10-Q) financial data from SEC EDGAR for S&
 1. Fetches S&P 100 ticker list from Wikipedia (with CSV fallback)
 2. Retrieves annual (10-K) and quarterly (10-Q) filings from SEC EDGAR
 3. Extracts **Revenue** and **EPS (Diluted)** metrics
-4. Uses fallback sources (yfinance, Alpha Vantage, Finnhub) when SEC data is incomplete
+4. Uses fallback sources (yfinance, Alpha Vantage) when SEC data is incomplete
 5. Calculates **Year-over-Year growth rates**, **TTM metrics**, and **CAGR**
 6. Outputs a single **sp100growth.json** file
 
 ## Data Sources
 
-- **Primary**: SEC EDGAR (10-K and 10-Q filings)
-- **Annual Fallbacks** (in priority order):
-  1. **yfinance** (Yahoo Finance) - Free, no API key required
-  2. **Alpha Vantage** - Requires `ALPHA_VANTAGE_API_KEY`
-  3. **Finnhub** - Requires `FINNHUB_API_KEY`
-- **Quarterly Fallback**: Finnhub API (when SEC quarterly data is incomplete)
-- **Universe**: Wikipedia S&P 100 constituents (with CSV fallback)
+### Primary Source
+- **SEC EDGAR**: 10-K (annual) and 10-Q (quarterly) filings
+
+### Annual Fallbacks (priority order)
+1. **yfinance** (Yahoo Finance) - Free, no API key required
+2. **Alpha Vantage** - Requires `ALPHA_VANTAGE_API_KEY`
+3. **FMP** (optional) - Requires `FMP_API_KEY` (disabled by default)
+
+### Quarterly Fallbacks (priority order)
+1. **yfinance** - Free quarterly financials
+2. **Finnhub** - Requires `FINNHUB_API_KEY`
+
+### Universe
+- Wikipedia S&P 100 constituents (with CSV fallback)
 
 ## Usage
 
@@ -109,10 +116,21 @@ Edit `config.yml` to customize:
 
 | Variable | Description | Required |
 |----------|-------------|----------|
-| `FINNHUB_API_KEY` | Finnhub API key for quarterly and annual fallback | Optional |
+| `FINNHUB_API_KEY` | Finnhub API key for quarterly fallback | Optional |
 | `ALPHA_VANTAGE_API_KEY` | Alpha Vantage API key for annual fallback | Optional |
+| `FMP_API_KEY` | FMP API key (disabled by default) | Optional |
 
-Note: yfinance requires no API key and is the primary fallback source.
+Note: yfinance requires no API key and is the primary fallback source for both annual and quarterly data.
+
+## Fallback Status
+
+When fallback data is used, the `*_validation` field indicates the confidence level:
+
+| Status | Description |
+|--------|-------------|
+| `validated` | Multiple sources agree within 5% |
+| `single_source` | Only one fallback source had data |
+| `discrepancy` | Sources disagree >5% (uses primary source) |
 
 ## Files
 
@@ -141,8 +159,15 @@ The multi-source fallback ensures near-complete data coverage:
 |-------------|-------|----------|
 | Banks (GS, WFC, MS) | Use different revenue concepts | Expanded SEC concepts + yfinance |
 | Non-calendar FY (NVDA) | SEC data gaps | yfinance fills missing years |
-| Payment processors (V) | Missing EPS | yfinance fallback |
-| Holding companies (BRK-B) | Non-standard EPS | yfinance fallback |
+| Payment processors (V) | Missing quarterly EPS | yfinance quarterly fallback |
+| Holding companies (BRK-B) | Non-standard EPS | yfinance/Alpha Vantage fallback |
+| Large tech (GOOGL) | SEC quarterly gaps | yfinance quarterly fallback |
+
+### Remaining Nulls
+Some nulls are structural (not data availability issues):
+- `*_cagr_5yr`: Need 6 years of data (some tickers don't have enough history)
+- `*_yoy.2020`: Historical data gaps in fallback sources
+- `ttm.*_yoy`: Need 8 quarters of data for TTM YoY comparison
 
 ## Schedule
 

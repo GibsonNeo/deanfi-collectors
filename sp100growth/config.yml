@@ -51,13 +51,13 @@ alphavantage:
 finnhub:
   enabled: true
 
-# Financial Modeling Prep (FMP) - Primary validation source for annual fallback data.
-# Used alongside yfinance and Alpha Vantage for 3-source consensus validation.
-# With ~100 tickers in SP100, this uses ~100 calls/day (well under 250/day limit).
-# Consensus logic: 2+ sources agree = validated, all differ = discrepancy (averaged)
+# Financial Modeling Prep (FMP) - Optional third source for validation.
+# DISABLED BY DEFAULT due to 250 calls/day limit on free tier.
+# When enabled, FMP is used as a third validation source alongside yfinance and Alpha Vantage.
+# Only enable if you have sufficient API quota or a premium account.
 # API key is read from environment variable FMP_API_KEY
 fmp:
-  enabled: true
+  enabled: false
 
 # Output settings
 output:
