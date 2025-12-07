@@ -24,7 +24,8 @@ Extracts annual (10-K) and quarterly (10-Q) financial data from SEC EDGAR for S&
 
 ### Quarterly Fallbacks (priority order)
 1. **yfinance** - Free quarterly financials
-2. **Finnhub** - Requires `FINNHUB_API_KEY`
+2. **Finnhub Standard** - Requires `FINNHUB_API_KEY`
+3. **Finnhub As Reported** - Raw SEC XBRL quarterly data with YTD-to-quarterly conversion (free)
 
 ### Universe
 - Wikipedia S&P 100 constituents (with CSV fallback)
@@ -173,8 +174,11 @@ The multi-source fallback ensures **100% CAGR data coverage** for all S&P 100 co
 - **EPS CAGR 3yr**: 100% coverage (0 nulls)
 
 ### TTM Coverage
-Some TTM YoY nulls may remain due to quarterly data gaps:
-- `ttm.*_yoy`: Need 8 quarters of data for TTM YoY comparison
+TTM YoY requires 8 consecutive quarters of complete data:
+- **ttm.revenue_yoy**: 100% coverage (0 nulls)
+- **ttm.eps_yoy**: 99% coverage (1 null - BRK-B due to Q4 2024 EPS unavailable)
+
+Note: BRK-B's TTM EPS null is a fundamental data limitation - Berkshire doesn't file Q4 10-Q reports, and Q4 2024 EPS is not available in yfinance.
 
 ## Schedule
 

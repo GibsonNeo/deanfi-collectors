@@ -5,6 +5,143 @@ This document tracks all implementations, changes, and updates to the DeanFi Col
 
 # DeanFi Collectors - Changelog and Implementation Log
 
+## 2025-12-07: SP100 Growth Collector - Finnhub As Reported QUARTERLY Integration
+
+### Summary
+Added Finnhub's "Financials As Reported" quarterly endpoint as a tertiary fallback for quarterly data, reducing TTM YoY null values from 6 to 2 (67% improvement). This resolves quarterly data gaps for BLK, GOOGL, and V where yfinance only has 5-6 quarters but TTM YoY calculation requires 8 consecutive quarters.
+
+### Problem
+TTM YoY (Year-over-Year) calculation requires 8 consecutive quarters:
+- Quarters 0-3: Current TTM period
+- Quarters 4-7: Prior TTM period
+
+Several problem tickers had insufficient quarterly data:
+| Ticker | yfinance Quarters | Result |
+|--------|-------------------|--------|
+| BLK | 5 quarters | TTM nulls (both) |
+| GOOGL | 6 quarters | Revenue YoY null |
+| V | 7 quarters | EPS YoY null |
+| BRK-B | 6 quarters | TTM nulls (both) |
+
+### API Discovery
+Tested Finnhub's quarterly financials endpoint:
+- **Standard endpoint** (`/stock/metric?metric=all`): Returns no quarterly data for problem tickers
+- **As Reported endpoint** (`/stock/financials-reported?freq=quarterly`): Returns 40+ quarters of SEC XBRL data
+
+### Key Challenge: YTD Data Format
+Finnhub As Reported returns **cumulative Year-To-Date (YTD)** values, NOT standalone quarterly values:
+- Q1: Standalone (3 months)
+- Q2: YTD (6 months cumulative)
+- Q3: YTD (9 months cumulative)
+- Q4: YTD (12 months = annual)
+
+**Solution**: Convert YTD to quarterly via subtraction:
+```python
+# YTD to Quarterly Conversion Logic
+Q1 = YTD_Q1 (standalone)
+Q2 = YTD_Q2 - YTD_Q1
+Q3 = YTD_Q3 - YTD_Q2
+Q4 = YTD_Q4 - YTD_Q3
+```
+
+### EPS Calculation Challenge
+Another issue: Finnhub's reported EPS values are also YTD cumulative (e.g., Visa Q3 EPS = $7.97 YTD, not ~$2.69 quarterly).
+
+**Solution**: Calculate EPS from Net Income / Shares:
+```python
+# Calculate EPS from fundamentals (more reliable than reported EPS)
+quarterly_eps = quarterly_net_income / diluted_shares
+```
+
+With fallbacks when shares unavailable:
+1. Use diluted shares if available
+2. Fallback to basic shares (BRK-B)
+3. Fallback to reported EPS directly (GOOGL)
+
+### Implementation Details
+
+**New Function**: `finnhub_as_reported_quarterly_financials()`
+```python
+def finnhub_as_reported_quarterly_financials(symbol: str, api_key: str, quarters_to_fetch: int = 8) -> pd.DataFrame:
+    """
+    Fetch quarterly financials from Finnhub's SEC XBRL filings.
+    
+    Key features:
+    - YTD to quarterly value conversion
+    - Smart field extraction (industry-specific revenue concepts)
+    - EPS calculation from Net Income / Shares
+    - Handles fiscal year boundaries
+    
+    Returns:
+        DataFrame with columns: period_end, revenue, eps_diluted, source
+    """
+```
+
+**Revenue Field Priority** (industry-specific):
+1. `RevenueFromContractWithCustomerExcludingAssessedTax`
+2. `Revenues`
+3. `RevenueFromContractWithCustomer`
+4. `TotalRevenuesAndOtherIncome`
+5. `SalesRevenueNet`
+
+**EPS Field Priority**:
+1. Calculate: `NetIncomeLoss / WeightedAverageNumberOfDilutedSharesOutstanding`
+2. Calculate: `NetIncomeLoss / WeightedAverageNumberOfSharesOutstandingBasic`
+3. Direct: `EarningsPerShareDiluted`, `DilutedEPS`, etc.
+
+### Integration
+Updated quarterly fallback chain:
+1. **yfinance** (primary - free, no API limits)
+2. **Finnhub Standard** (secondary - API endpoint)
+3. **Finnhub As Reported** (tertiary - SEC XBRL data) ← NEW
+
+Fallback trigger condition fixed to require 8 quarters (was incorrectly checking for 4):
+```python
+need_more_quarters = len(quarterly_data) < 8
+```
+
+### Results
+| Metric | Before | After | Improvement |
+|--------|--------|-------|-------------|
+| ttm.revenue | 0 | 0 | - |
+| ttm.eps_diluted | 1 | 1 | - |
+| ttm.revenue_yoy | 2 | 0 | ✅ -2 (BLK, GOOGL fixed) |
+| ttm.eps_yoy | 3 | 1 | ✅ -2 (BLK, V fixed) |
+| **Total TTM Nulls** | **6** | **2** | **-4 (67%)** |
+
+### Ticker-Specific Outcomes
+| Ticker | Revenue YoY | EPS YoY | Status |
+|--------|-------------|---------|--------|
+| BLK | 18.9% | -7.5% | ✅ FIXED (both) |
+| GOOGL | 16.7% | 36.1% | ✅ FIXED (revenue) |
+| V | 11.3% | 14.1% | ✅ FIXED (EPS) |
+| BRK-B | 13.5% | null | ⚠️ Q4 2024 EPS unavailable |
+
+### Remaining Null Analysis
+BRK-B's `ttm.eps_yoy` remains null because:
+- Q4 2024 EPS is not available in yfinance (returns NULL)
+- Berkshire doesn't file a 10-Q for Q4 (only 10-K annual)
+- Berkshire's EPS is highly volatile due to investment gains/losses
+- This is a fundamental data availability issue, not a code limitation
+
+### Files Changed
+- `sp100growth/fetch_sp100_growth.py`:
+  - Added `finnhub_as_reported_quarterly_financials()` function (~165 lines)
+  - Updated quarterly fallback chain to include 3rd source
+  - Fixed fallback trigger to check for 8 quarters (TTM requirement)
+  - Updated TTM source detection to include "finnhub_as_reported"
+
+### Final Coverage Summary
+| Metric | Nulls | Coverage |
+|--------|-------|----------|
+| CAGR (all 6 metrics) | 0 | 100% |
+| TTM Revenue | 0 | 100% |
+| TTM EPS | 1 (BRK-B) | 99% |
+| TTM Revenue YoY | 0 | 100% |
+| TTM EPS YoY | 1 (BRK-B) | 99% |
+
+---
+
 ## 2025-12-07: SP100 Growth Collector - FMP (Financial Modeling Prep) Fallback Update
 
 ### Summary

@@ -294,6 +294,240 @@ def finnhub_quarterly_financials(symbol: str, api_key: str, timeout: int = 15) -
     return df
 
 
+def finnhub_as_reported_quarterly_financials(symbol: str, api_key: str, quarters_to_fetch: int = 12, timeout: int = 15) -> pd.DataFrame:
+    """
+    Fetch quarterly revenue and EPS from Finnhub As Reported SEC filings.
+    
+    This function uses Finnhub's SEC filings endpoint which provides actual 10-Q data.
+    The data is reported as Year-to-Date (YTD) values, so we convert to quarterly by
+    subtracting the previous quarter's YTD from the current quarter's YTD.
+    
+    Why this is needed:
+    - Standard Finnhub API returns no quarterly data for some major companies (BLK, GOOGL, V)
+    - yfinance only has ~5-6 quarters of history
+    - This provides 12+ quarters of data directly from SEC filings
+    
+    The function:
+    1. Fetches SEC quarterly filings from Finnhub
+    2. Extracts Revenue YTD and calculates quarterly Revenue by subtraction
+    3. For EPS, tries multiple approaches:
+       a. If reported EPS is already quarterly (not YTD), use it directly
+       b. Otherwise, calculate from Net Income / Shares (YTD-to-quarterly conversion)
+    
+    Special handling:
+    - GOOGL: Uses reported EPS directly (no share count in filing)
+    - V (Visa): Calculates EPS from Net Income/Shares (reported EPS is YTD cumulative)
+    - BRK-B: Revenue only (Class A EPS not convertible)
+    
+    Returns DataFrame with columns: end, revenue, eps_diluted, source
+    """
+    if not api_key:
+        return pd.DataFrame(columns=["end", "revenue", "eps_diluted", "source"])
+    
+    try:
+        url = f"https://finnhub.io/api/v1/stock/financials-reported?symbol={symbol}&freq=quarterly&token={api_key}"
+        r = requests.get(url, timeout=timeout)
+        if r.status_code != 200:
+            return pd.DataFrame(columns=["end", "revenue", "eps_diluted", "source"])
+        
+        data = r.json()
+        reports = data.get("data", [])
+        
+        if not reports:
+            return pd.DataFrame(columns=["end", "revenue", "eps_diluted", "source"])
+        
+        # Sort reports by fiscal year and quarter
+        sorted_reports = sorted(reports, key=lambda x: (x.get("year", 0), x.get("quarter", 0)))
+        
+        # Extract YTD values for each quarter
+        quarterly_ytd = []
+        for report in sorted_reports:
+            year = report.get("year")
+            quarter = report.get("quarter")
+            end_date = report.get("endDate", "")
+            if " " in end_date:
+                end_date = end_date.split(" ")[0]  # Clean up datetime format
+            
+            ic = report.get("report", {}).get("ic", [])
+            
+            # Extract values from income statement
+            revenue_ytd = None
+            net_income_ytd = None
+            shares_diluted = None
+            shares_basic = None
+            eps_reported_ytd = None
+            
+            for item in ic:
+                concept = item.get("concept", "")
+                value = item.get("value")
+                
+                # Revenue - try multiple XBRL concepts
+                if revenue_ytd is None:
+                    if concept in [
+                        "us-gaap_RevenueFromContractWithCustomerExcludingAssessedTax",
+                        "us-gaap_Revenues",
+                        "us-gaap_Revenue",
+                        "us-gaap_TotalRevenuesAndOtherIncome",
+                        "us-gaap_SalesRevenueNet",
+                        "us-gaap_RevenueFromContractWithCustomerIncludingAssessedTax",
+                        "us-gaap_InterestAndDividendIncomeOperating",  # For financial companies
+                    ]:
+                        if value is not None:
+                            try:
+                                revenue_ytd = float(value)
+                            except (ValueError, TypeError):
+                                pass
+                
+                # Net Income - for EPS calculation
+                if net_income_ytd is None:
+                    if concept in [
+                        "us-gaap_ProfitLoss",
+                        "us-gaap_NetIncomeLoss",
+                        "us-gaap_NetIncomeLossAvailableToCommonStockholdersBasic",
+                    ]:
+                        if value is not None:
+                            try:
+                                net_income_ytd = float(value)
+                            except (ValueError, TypeError):
+                                pass
+                
+                # Diluted shares - for EPS calculation
+                if shares_diluted is None:
+                    if concept == "us-gaap_WeightedAverageNumberOfDilutedSharesOutstanding":
+                        if value is not None:
+                            try:
+                                shares_diluted = float(value)
+                            except (ValueError, TypeError):
+                                pass
+                
+                # Basic shares - fallback for EPS calculation
+                if shares_basic is None:
+                    if concept == "us-gaap_WeightedAverageNumberOfSharesOutstandingBasic":
+                        if value is not None:
+                            try:
+                                shares_basic = float(value)
+                            except (ValueError, TypeError):
+                                pass
+                
+                # Reported EPS - use directly if share count is unavailable
+                if eps_reported_ytd is None:
+                    if concept == "us-gaap_EarningsPerShareDiluted":
+                        if value is not None:
+                            try:
+                                eps_reported_ytd = float(value)
+                            except (ValueError, TypeError):
+                                pass
+            
+            # Use diluted shares if available, otherwise basic shares
+            shares = shares_diluted if shares_diluted is not None else shares_basic
+            
+            quarterly_ytd.append({
+                "year": year,
+                "quarter": quarter,
+                "end_date": end_date,
+                "revenue_ytd": revenue_ytd,
+                "net_income_ytd": net_income_ytd,
+                "shares": shares,
+                "eps_reported_ytd": eps_reported_ytd,
+            })
+        
+        # Detect if EPS is quarterly or YTD based on pattern
+        # If Q1 EPS is very different from Q2 EPS (Q2 should be ~2x Q1 if YTD),
+        # then EPS is likely already quarterly
+        eps_is_ytd = True  # Default assumption
+        if len(quarterly_ytd) >= 3:
+            # Find Q1 and Q2 in same fiscal year
+            for i, q in enumerate(quarterly_ytd):
+                if q["quarter"] == 1 and q["eps_reported_ytd"] is not None:
+                    for j in range(i + 1, len(quarterly_ytd)):
+                        q2 = quarterly_ytd[j]
+                        if q2["year"] == q["year"] and q2["quarter"] == 2 and q2["eps_reported_ytd"] is not None:
+                            ratio = q2["eps_reported_ytd"] / q["eps_reported_ytd"] if q["eps_reported_ytd"] != 0 else 0
+                            # If ratio is ~2x, it's YTD; if ~1x, it's quarterly
+                            if 0.5 < ratio < 1.5:
+                                eps_is_ytd = False  # EPS is already quarterly
+                            break
+                    break
+        
+        # Convert YTD to Quarterly values
+        rows = []
+        for i, curr in enumerate(quarterly_ytd):
+            if not curr["end_date"]:
+                continue
+            
+            # Revenue: Convert YTD to quarterly
+            quarterly_revenue = None
+            if curr["revenue_ytd"] is not None:
+                if curr["quarter"] == 1:
+                    # Q1 YTD = Q1 (first quarter of fiscal year)
+                    quarterly_revenue = curr["revenue_ytd"]
+                else:
+                    # Find previous quarter in same fiscal year
+                    for j in range(i - 1, -1, -1):
+                        prev = quarterly_ytd[j]
+                        if prev["year"] == curr["year"] and prev["quarter"] == curr["quarter"] - 1:
+                            if prev["revenue_ytd"] is not None:
+                                quarterly_revenue = curr["revenue_ytd"] - prev["revenue_ytd"]
+                            break
+            
+            # EPS: Multiple strategies depending on data availability
+            quarterly_eps = None
+            
+            # Strategy 1: If no share count, use reported EPS (works for GOOGL)
+            if curr["shares"] is None and curr["eps_reported_ytd"] is not None:
+                if eps_is_ytd:
+                    # Convert YTD EPS to quarterly
+                    if curr["quarter"] == 1:
+                        quarterly_eps = curr["eps_reported_ytd"]
+                    else:
+                        for j in range(i - 1, -1, -1):
+                            prev = quarterly_ytd[j]
+                            if prev["year"] == curr["year"] and prev["quarter"] == curr["quarter"] - 1:
+                                if prev["eps_reported_ytd"] is not None:
+                                    quarterly_eps = curr["eps_reported_ytd"] - prev["eps_reported_ytd"]
+                                break
+                else:
+                    # EPS is already quarterly
+                    quarterly_eps = curr["eps_reported_ytd"]
+            
+            # Strategy 2: Calculate from Net Income / Shares (preferred when shares available)
+            elif curr["net_income_ytd"] is not None and curr["shares"]:
+                # Convert Net Income YTD to quarterly
+                quarterly_net_income = None
+                if curr["quarter"] == 1:
+                    quarterly_net_income = curr["net_income_ytd"]
+                else:
+                    for j in range(i - 1, -1, -1):
+                        prev = quarterly_ytd[j]
+                        if prev["year"] == curr["year"] and prev["quarter"] == curr["quarter"] - 1:
+                            if prev["net_income_ytd"] is not None:
+                                quarterly_net_income = curr["net_income_ytd"] - prev["net_income_ytd"]
+                            break
+                
+                # Calculate EPS = Net Income / Diluted Shares
+                if quarterly_net_income is not None:
+                    quarterly_eps = quarterly_net_income / curr["shares"]
+            
+            if quarterly_revenue is not None or quarterly_eps is not None:
+                rows.append({
+                    "end": curr["end_date"],
+                    "revenue": quarterly_revenue,
+                    "eps_diluted": quarterly_eps,
+                    "source": "finnhub_as_reported",
+                })
+        
+        if not rows:
+            return pd.DataFrame(columns=["end", "revenue", "eps_diluted", "source"])
+        
+        df = pd.DataFrame(rows)
+        df = df.sort_values("end", ascending=False).drop_duplicates("end", keep="first")
+        return df.head(quarters_to_fetch)
+        
+    except Exception as e:
+        print(f"[warn] Finnhub As Reported quarterly error for {symbol}: {e}")
+        return pd.DataFrame(columns=["end", "revenue", "eps_diluted", "source"])
+
+
 # ============================================================================
 # Multi-Source Validation (Consensus-Based)
 # ============================================================================
@@ -1530,18 +1764,43 @@ def extract_company_data(
     
     # ========== QUARTERLY FALLBACK (yfinance first, then Finnhub) ==========
     # Check if SEC quarterly data is incomplete for TTM calculation.
-    # We need the MOST RECENT 4 quarters to have both revenue and EPS for accurate TTM.
-    # Also trigger fallback if ANY quarter in the top 8 is missing data (helps CAGR calculations).
+    # We need the MOST RECENT 4 quarters to have both revenue and EPS for TTM.
+    # We need 8 quarters for TTM YoY calculation.
+    # Also trigger fallback if ANY quarter in the top 8 is missing data.
     recent_4 = quarterly_data[:4] if len(quarterly_data) >= 4 else quarterly_data
     recent_4_revenue = sum(1 for q in recent_4 if q.revenue is not None)
     recent_4_eps = sum(1 for q in recent_4 if q.eps_diluted is not None)
     
+    # For TTM YoY, we need 8 quarters with complete data
+    recent_8 = quarterly_data[:8] if len(quarterly_data) >= 8 else quarterly_data
+    recent_8_revenue = sum(1 for q in recent_8 if q.revenue is not None)
+    recent_8_eps = sum(1 for q in recent_8 if q.eps_diluted is not None)
+    
     any_null_revenue = any(q.revenue is None for q in quarterly_data)
     any_null_eps = any(q.eps_diluted is None for q in quarterly_data)
     
-    # Trigger fallback if: most recent 4 quarters are incomplete OR any quarter has nulls
-    need_quarterly_fallback = (recent_4_revenue < 4 or recent_4_eps < 4 or any_null_revenue or any_null_eps)
+    # Trigger fallback if:
+    # 1. Most recent 4 quarters are incomplete (for basic TTM)
+    # 2. Any quarter has nulls
+    # 3. We have fewer than 8 quarters (needed for TTM YoY)
+    need_quarterly_fallback = (
+        recent_4_revenue < 4 or 
+        recent_4_eps < 4 or 
+        any_null_revenue or 
+        any_null_eps or
+        len(quarterly_data) < 8 or  # Need 8 quarters for TTM YoY
+        recent_8_revenue < 8 or     # Need 8 quarters with revenue for full TTM YoY
+        recent_8_eps < 8            # Need 8 quarters with EPS for full TTM YoY
+    )
     quarterly_source = "sec"
+    
+    def check_need_more_quarters():
+        """Check if we still need more quarterly data for TTM YoY calculation."""
+        current_8 = quarterly_data[:8] if len(quarterly_data) >= 8 else quarterly_data
+        rev_count = sum(1 for q in current_8 if q.revenue is not None)
+        eps_count = sum(1 for q in current_8 if q.eps_diluted is not None)
+        # Need 8 quarters with data for full TTM YoY
+        return len(quarterly_data) < 8 or rev_count < 8 or eps_count < 8
     
     def merge_quarterly_fallback(df: pd.DataFrame, source_name: str):
         """Helper to merge fallback data into quarterly_data."""
@@ -1587,15 +1846,22 @@ def extract_company_data(
             yf_quarterly = yfinance_quarterly_financials(ticker, config.quarters_to_fetch)
             merge_quarterly_fallback(yf_quarterly, "yfinance")
         
-        # Recheck if still need fallback
-        current_revenue = sum(1 for q in quarterly_data if q.revenue is not None)
-        current_eps = sum(1 for q in quarterly_data if q.eps_diluted is not None)
-        still_need_fallback = (current_revenue < 4 or current_eps < 4)
+        # Recheck if still need more data for TTM YoY (requires 8 quarters)
+        still_need_fallback = check_need_more_quarters()
         
-        # 2. Try Finnhub if still incomplete
+        # 2. Try standard Finnhub if still incomplete
         if still_need_fallback and config.finnhub_enabled and config.finnhub_api_key:
             finnhub_df = finnhub_quarterly_financials(ticker, config.finnhub_api_key)
             merge_quarterly_fallback(finnhub_df, "finnhub")
+        
+        # Recheck again
+        still_need_fallback = check_need_more_quarters()
+        
+        # 3. Try Finnhub As Reported (SEC XBRL data with YTD-to-quarterly conversion)
+        # This provides 12+ quarters of data for companies where other sources have gaps
+        if still_need_fallback and config.finnhub_as_reported_enabled and config.finnhub_api_key:
+            far_quarterly = finnhub_as_reported_quarterly_financials(ticker, config.finnhub_api_key, config.quarters_to_fetch)
+            merge_quarterly_fallback(far_quarterly, "finnhub_as_reported")
         
         # Re-sort and limit
         quarterly_data.sort(key=lambda x: x.fiscal_quarter_end, reverse=True)
@@ -1631,10 +1897,11 @@ def extract_company_data(
         
         # Determine source
         sources = set(q.source for q in quarterly_data[:4])
-        if "finnhub" in sources and "sec" in sources:
+        fallback_sources = {"finnhub", "finnhub_as_reported", "yfinance"}
+        if sources & fallback_sources and "sec" in sources:
             ttm_source = "mixed"
-        elif "finnhub" in sources:
-            ttm_source = "finnhub"
+        elif sources & fallback_sources:
+            ttm_source = "mixed"  # Multiple fallback sources
         else:
             ttm_source = "sec"
         
