@@ -61,6 +61,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 # Import S&P 100 universe from shared module
 from shared.sp100_universe import fetch_sp100_tickers
+from shared.sector_mapping import get_sector
 
 
 # ============================================================================
@@ -2047,6 +2048,7 @@ def company_data_to_dict(data: CompanyData) -> dict:
     """Convert CompanyData to JSON-serializable dict."""
     return {
         "ticker": data.ticker,
+        "sector": get_sector(data.ticker),
         "cik": data.cik,
         "company_name": data.company_name,
         "extracted_at": data.extracted_at,
@@ -2174,6 +2176,11 @@ def main():
             "quarterly_fallback": "Finnhub API"
         },
         "metrics_explained": {
+            "sector": {
+                "description": "GICS sector classification for the company",
+                "format": "String (e.g., 'Information Technology', 'Health Care', 'Financials')",
+                "source": "shared/sector_mapping.py - comprehensive S&P 500 sector mapping"
+            },
             "revenue_yoy": {
                 "description": "Year-over-year revenue growth rate",
                 "format": "Decimal (0.05 = 5% growth, -0.03 = 3% decline)",

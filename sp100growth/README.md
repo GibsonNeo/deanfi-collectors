@@ -64,6 +64,7 @@ Output is saved to `output/sp100growth.json`:
   "companies": {
     "AAPL": {
       "ticker": "AAPL",
+      "sector": "Information Technology",
       "cik": "0000320193",
       "company_name": "Apple Inc.",
       "extracted_at": "2025-12-06T23:30:00Z",
@@ -93,6 +94,7 @@ Output is saved to `output/sp100growth.json`:
 
 | Metric | Description | Format |
 |--------|-------------|--------|
+| `sector` | GICS sector classification | String (e.g., 'Information Technology') |
 | `revenue_yoy` | Year-over-year revenue growth | Decimal (0.05 = 5%) |
 | `eps_yoy` | Year-over-year EPS growth | Decimal |
 | `ttm.revenue` | Trailing 12 months revenue | USD |

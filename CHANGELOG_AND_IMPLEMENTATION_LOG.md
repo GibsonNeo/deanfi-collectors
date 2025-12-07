@@ -5,6 +5,45 @@ This document tracks all implementations, changes, and updates to the DeanFi Col
 
 # DeanFi Collectors - Changelog and Implementation Log
 
+## 2025-12-07: SP100 Growth Collector - Added Sector Field to Output
+
+### Summary
+Added GICS sector classification to each company's JSON output in sp100growth.json. This enables sector-based filtering and analysis of growth metrics.
+
+### Implementation
+
+**Changes Made:**
+1. **Import**: Added `get_sector` from `shared/sector_mapping.py` in `fetch_sp100_growth.py`
+2. **Output**: Added `sector` field to `company_data_to_dict()` function, placed right after `ticker`
+3. **Documentation**: Added sector explanation to `_README.metrics_explained` section in generated JSON
+
+### Files Changed
+- `sp100growth/fetch_sp100_growth.py`: Added import and sector field to output
+- `sp100growth/README.md`: Updated output format example and metrics table
+- `CHANGELOG_AND_IMPLEMENTATION_LOG.md`: This entry
+
+### Output Example
+```json
+{
+  "AAPL": {
+    "ticker": "AAPL",
+    "sector": "Information Technology",
+    "cik": "0000320193",
+    ...
+  }
+}
+```
+
+### Sector Values
+Uses the 11 GICS sectors from `shared/sector_mapping.py`:
+- Information Technology, Health Care, Financials, Consumer Discretionary
+- Communication Services, Industrials, Consumer Staples, Energy
+- Utilities, Real Estate, Materials
+
+Returns `"Unknown"` if ticker is not found in the mapping.
+
+---
+
 ## 2025-12-07: SP100 Growth Collector - BRK-B EPS & USB Bank Revenue Fixes
 
 ### Summary
