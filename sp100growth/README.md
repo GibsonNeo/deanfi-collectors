@@ -19,8 +19,8 @@ Extracts annual (10-K) and quarterly (10-Q) financial data from SEC EDGAR for S&
 ### Annual Fallbacks (priority order)
 1. **yfinance** (Yahoo Finance) - Free, no API key required
 2. **Alpha Vantage** - Requires `ALPHA_VANTAGE_API_KEY`
-3. **Finnhub As Reported** - Raw SEC XBRL data, excellent for banks/REITs
-4. **FMP** (optional) - Requires `FMP_API_KEY` (disabled by default due to rate limits)
+3. **Finnhub As Reported** - Raw SEC XBRL data, excellent for banks/REITs (free)
+4. **FMP** (optional) - Requires `FMP_API_KEY`, 250 calls/day limit, ~90% SP100 coverage on free tier
 
 ### Quarterly Fallbacks (priority order)
 1. **yfinance** - Free quarterly financials

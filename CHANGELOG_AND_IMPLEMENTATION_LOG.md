@@ -5,6 +5,48 @@ This document tracks all implementations, changes, and updates to the DeanFi Col
 
 # DeanFi Collectors - Changelog and Implementation Log
 
+## 2025-12-07: SP100 Growth Collector - FMP (Financial Modeling Prep) Fallback Update
+
+### Summary
+Updated FMP function to use the new `/stable/` API endpoint and improved error handling for free tier limitations. FMP remains as an optional final fallback source in the chain.
+
+### API Testing Results
+Tested FMP's free tier with the new `/stable/` endpoint format:
+- **Endpoint**: `https://financialmodelingprep.com/stable/income-statement?symbol={ticker}&apikey={key}`
+- **Coverage**: ~90% of SP100 tickers accessible on free tier
+- **Data**: 5 years of annual data (FY periods)
+- **Blocked**: Some tickers require premium (402 error) - USB, BLK, SPG, BRK-B
+
+### Changes Made
+1. **Updated docstring** with free tier limitations documentation
+2. **Improved 402 handling**: Silently skip premium-required tickers (no warnings)
+3. **Added comments** clarifying 4xx error handling behavior
+
+### Free Tier Coverage
+| Accessible | Premium Required |
+|------------|-----------------|
+| AAPL, MSFT, GOOGL, AMZN, META | USB, BLK, SPG, BRK-B |
+| JPM, BAC, WFC, C, GS (banks) | COP, PG |
+| XOM, CVX (energy) | |
+| JNJ, PFE, UNH (healthcare) | |
+
+### Fallback Chain (Updated Priority)
+1. **SEC EDGAR** (primary - authoritative source)
+2. **yfinance** (free, no API limits)
+3. **Alpha Vantage** (requires API key)
+4. **Finnhub As Reported** (free, excellent for banks/REITs) ← Main fallback
+5. **FMP** (optional, 250 calls/day limit) ← Final insurance
+
+### Files Changed
+- `sp100growth/fetch_sp100_growth.py`: Updated `fmp_annual_financials()` docstring and error handling
+- `sp100growth/config.yml`: Updated FMP configuration documentation
+
+### Notes
+FMP remains disabled by default since Finnhub As Reported already achieves 100% CAGR coverage.
+FMP can be enabled as additional insurance for future edge cases.
+
+---
+
 ## 2025-12-07: SP100 Growth Collector - Finnhub "Financials As Reported" Integration
 
 ### Summary

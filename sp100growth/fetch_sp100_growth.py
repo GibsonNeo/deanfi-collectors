@@ -1017,9 +1017,15 @@ def fmp_annual_financials(symbol: str, api_key: str, years_to_fetch: int = 6, ti
     """
     Fetch annual revenue and EPS from Financial Modeling Prep API.
     
-    FMP is used as part of the 3-source consensus validation system.
-    With ~100 tickers and 250 calls/day, FMP provides reliable third-party 
-    validation for all fallback data.
+    FMP serves as the final fallback in the data source chain. It provides 5 years
+    of annual data for most major tickers on the free tier.
+    
+    Free Tier Limitations:
+    - 250 API calls/day
+    - Some tickers require premium (402 error) - silently skipped
+    - Coverage: ~90% of SP100, excludes some mid-cap and specialty companies
+    
+    Uses the /stable/ API endpoint (v2024+).
     
     Returns DataFrame with columns: end, revenue, eps_diluted, source
     """
@@ -1066,10 +1072,15 @@ def fmp_annual_financials(symbol: str, api_key: str, years_to_fetch: int = 6, ti
                         rec["eps_diluted"] = float(eps)
                     except:
                         pass
+        elif r.status_code == 402:
+            # Premium required for this ticker - silently skip (expected for some tickers)
+            pass
         elif r.status_code == 429:
             print(f"[warn] FMP rate limit reached for {symbol}")
-        else:
-            print(f"[warn] FMP error for {symbol}: HTTP {r.status_code}")
+        elif r.status_code >= 500:
+            print(f"[warn] FMP server error for {symbol}: HTTP {r.status_code}")
+        # Note: 4xx errors (except 402/429) are silently skipped as they indicate
+        # the ticker is not available on FMP free tier
             
     except Exception as e:
         print(f"[warn] FMP error for {symbol}: {e}")

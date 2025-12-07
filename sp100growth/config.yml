@@ -5,7 +5,7 @@
 
 sec:
   # Required by SEC - use a descriptive user agent with contact info
-  user_agent: "DeanFiCollectors/1.0 (wesdean13@gmail.com)"
+  user_agent: "DeanFiCollectors/1.0 (support@deanfinancials.com)"
 
 # How many years of annual data to fetch (10-K filings)
 # Note: To show 5 years of YoY growth, we need 6 years of data
@@ -61,13 +61,19 @@ finnhub_as_reported:
 finnhub:
   enabled: true
 
-# Financial Modeling Prep (FMP) - Optional third source for validation.
+# Financial Modeling Prep (FMP) - Optional final fallback source.
 # DISABLED BY DEFAULT due to 250 calls/day limit on free tier.
-# When enabled, FMP is used as a third validation source alongside yfinance and Alpha Vantage.
-# Only enable if you have sufficient API quota or a premium account.
+# 
+# Free Tier Coverage:
+# - Works for ~90% of major SP100 tickers (AAPL, MSFT, JPM, BAC, etc.)
+# - Some tickers require premium subscription (402 error) - silently skipped
+# - Returns 5 years of annual data when available
+#
+# When enabled, FMP provides additional validation and fallback data alongside
+# yfinance, Alpha Vantage, and Finnhub As Reported.
 # API key is read from environment variable FMP_API_KEY
 fmp:
-  enabled: false
+  enabled: true
 
 # Output settings
 output:
