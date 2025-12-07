@@ -5,6 +5,56 @@ This document tracks all implementations, changes, and updates to the DeanFi Col
 
 # DeanFi Collectors - Changelog and Implementation Log
 
+## 2025-12-07: SP100 Growth Collector - Linear Annualized Rate Fallback for Negative EPS
+
+### Summary
+Enhanced CAGR calculation to handle negative/zero EPS values by falling back to Linear Annualized Rate when standard CAGR cannot be computed.
+
+### Problem
+Standard CAGR formula `(end/start)^(1/n) - 1` fails when:
+- Start value is negative (can't take root of negative)
+- End value is negative (same issue)
+- Either value is zero (division issues)
+
+This affected companies with losses: AIG, BA, BMY, GE, INTC, PLTR, UBER (all had negative EPS in some years).
+
+### Solution
+Added Linear Annualized Rate fallback:
+```python
+def calculate_cagr(start_val, end_val, years):
+    # Standard CAGR when both values are positive
+    if start_val > 0 and end_val > 0:
+        return (end_val / start_val) ** (1 / years) - 1
+    
+    # Fallback to Linear Annualized Rate for negative/zero values
+    # Formula: (end - start) / abs(start) / years
+    if start_val != 0:
+        return (end_val - start_val) / abs(start_val) / years
+```
+
+### Interpretation Examples
+| Ticker | Start EPS | End EPS | Linear Rate | Meaning |
+|--------|-----------|---------|-------------|---------|
+| BA | -1.12 | -18.36 | -307.9%/yr | Losses grew dramatically |
+| UBER | -6.81 | +4.56 | +33.4%/yr | Turnaround from loss to profit |
+| GE | -4.99 | +5.99 | +44.0%/yr | Strong recovery |
+| INTC | +4.71 | -4.38 | -38.6%/yr | Went from profit to loss |
+
+### Results
+| Metric | Before | After | Improvement |
+|--------|--------|-------|-------------|
+| Total Nulls | 28 | 11 | 61% reduction |
+| eps_cagr_3yr | 7 | 0 | 100% fixed |
+| eps_cagr_5yr | 14 | 4 | 71% fixed |
+
+### Remaining Nulls (11 total)
+- `revenue_cagr_5yr`: 2 (TSLA, USB - rate limit/missing fallback data)
+- `eps_cagr_5yr`: 4 (BLK, BRK-B, SPG, V - missing 2019 EPS in fallback)
+- `ttm.revenue_yoy`: 2 (BLK, GOOGL - quarterly data gaps)
+- `ttm.eps_yoy`: 3 (BLK, BRK-B, V - quarterly EPS gaps)
+
+---
+
 ## 2025-12-07: SP100 Growth Collector - Annual Data Quality Fixes
 
 ### Summary

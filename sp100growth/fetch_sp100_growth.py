@@ -1059,13 +1059,35 @@ def calculate_yoy_growth(values: List[Optional[float]]) -> Dict[str, Optional[fl
 
 
 def calculate_cagr(start_val: Optional[float], end_val: Optional[float], years: int) -> Optional[float]:
-    """Calculate Compound Annual Growth Rate."""
-    if start_val is None or end_val is None or start_val <= 0 or years <= 0:
+    """
+    Calculate Compound Annual Growth Rate.
+    
+    When standard CAGR can't be computed (negative/zero values), falls back to
+    Linear Annualized Rate: (end - start) / abs(start) / years
+    
+    This provides a meaningful growth metric even for companies with losses.
+    """
+    if start_val is None or end_val is None or years <= 0:
         return None
-    try:
-        return round((end_val / start_val) ** (1 / years) - 1, 4)
-    except Exception:
-        return None
+    
+    # Standard CAGR when both values are positive
+    if start_val > 0 and end_val > 0:
+        try:
+            return round((end_val / start_val) ** (1 / years) - 1, 4)
+        except Exception:
+            return None
+    
+    # Fallback to Linear Annualized Rate for negative/zero values
+    # Formula: (end - start) / abs(start) / years
+    # This shows the average annual change as a percentage of the absolute starting value
+    if start_val != 0:
+        try:
+            linear_rate = (end_val - start_val) / abs(start_val) / years
+            return round(linear_rate, 4)
+        except Exception:
+            return None
+    
+    return None
 
 
 def calculate_ttm(quarters: List[QuarterlyRecord], metric: str) -> Optional[float]:
