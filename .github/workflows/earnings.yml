@@ -2,11 +2,11 @@ name: Earnings Collection
 
 on:
   schedule:
-    # Weeknights at 11:00pm Eastern (04:00 UTC Tue-Sat) to capture next-day earnings
-    # GitHub Actions cron uses UTC; 04:00 UTC maps to:
-    #   • 11:00pm EST (standard time roughly Nov–Mar)
-    #   • 12:00am EDT (daylight saving time roughly Mar–Nov)
-    - cron: '0 4 * * 2-6'
+    # Weeknights at 10:45pm Eastern (03:45 UTC Tue-Sat) to capture next-day earnings
+    # GitHub Actions cron uses UTC; 03:45 UTC maps to:
+    #   • 10:45pm EST (standard time roughly Nov–Mar)
+    #   • 11:45pm EDT (daylight saving time roughly Mar–Nov)
+    - cron: '45 3 * * 2-6'
     # - cron: '0 3 * * 2-6'  # Optional: run at 11:00pm EDT instead of midnight EDT
   workflow_dispatch:
 
