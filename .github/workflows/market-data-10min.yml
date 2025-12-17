@@ -3,10 +3,15 @@ name: Market Data Collection (10-min)
 on:
   schedule:
     # Every 10 minutes during market hours (8:05am-4:55pm ET) with a 5-minute offset to avoid top-of-hour collisions
-    # EST (roughly Nov–Mar): 13:05-21:55 UTC
-    - cron: '5-55/10 13-21 * * 1-5'
-    # EDT (roughly Mar–Nov): 12:05-20:55 UTC (uncomment when observing daylight saving time)
-    # - cron: '5-55/10 12-20 * * 1-5'
+    # SKIPS the noon hour (12:00-12:59 ET) to allow options-whales collector to run uninterrupted
+    # 
+    # EST (roughly Nov–Mar): 13:05-16:55 UTC (8am-12pm ET), then 18:05-21:55 UTC (1pm-5pm ET)
+    - cron: '5-55/10 13-16 * * 1-5'  # Morning session: 8am-12pm ET
+    - cron: '5-55/10 18-21 * * 1-5'  # Afternoon session: 1pm-5pm ET (skips 12pm-1pm for options whales)
+    # 
+    # EDT (roughly Mar–Nov): 12:05-15:55 UTC (8am-12pm ET), then 17:05-20:55 UTC (1pm-5pm ET)
+    # - cron: '5-55/10 12-15 * * 1-5'  # Morning session EDT
+    # - cron: '5-55/10 17-20 * * 1-5'  # Afternoon session EDT
   workflow_dispatch:
 
 env:
