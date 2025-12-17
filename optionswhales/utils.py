@@ -29,6 +29,76 @@ import pandas as pd
 
 
 # =============================================================================
+# TICKER FORMAT CONVERSION
+# =============================================================================
+
+# Tickers that need special handling for Alpaca API
+# Alpaca uses dot notation (BRK.B) while Yahoo/SEC use dash (BRK-B)
+ALPACA_TICKER_MAP = {
+    "BRK-B": "BRK.B",  # Berkshire Hathaway Class B
+    "BF-B": "BF.B",    # Brown-Forman Class B
+}
+
+# Reverse map for converting back
+ALPACA_TICKER_REVERSE = {v: k for k, v in ALPACA_TICKER_MAP.items()}
+
+# Tickers to skip entirely (no options or problematic)
+SKIP_TICKERS = {
+    "BRK.A",  # Berkshire Class A - extremely high price, no liquid options
+    "BRK-A",
+}
+
+
+def convert_ticker_for_alpaca(ticker: str) -> Optional[str]:
+    """
+    Convert ticker symbol to Alpaca API format.
+    
+    Alpaca uses dot notation for share classes (BRK.B, BF.B)
+    while Yahoo Finance and others use dash notation (BRK-B, BF-B).
+    
+    Args:
+        ticker: Ticker symbol in standard format (e.g., BRK-B)
+        
+    Returns:
+        Alpaca-compatible ticker, or None if should be skipped
+    """
+    # Skip problematic tickers
+    if ticker in SKIP_TICKERS:
+        return None
+    
+    # Apply known conversions
+    if ticker in ALPACA_TICKER_MAP:
+        return ALPACA_TICKER_MAP[ticker]
+    
+    # Convert any remaining dashes in class notation to dots
+    # e.g., "XXX-A" -> "XXX.A" for share classes
+    if '-' in ticker and len(ticker.split('-')[-1]) == 1:
+        return ticker.replace('-', '.')
+    
+    return ticker
+
+
+def convert_ticker_from_alpaca(ticker: str) -> str:
+    """
+    Convert ticker from Alpaca format back to standard format.
+    
+    Args:
+        ticker: Ticker in Alpaca format (e.g., BRK.B)
+        
+    Returns:
+        Standard format ticker (e.g., BRK-B)
+    """
+    if ticker in ALPACA_TICKER_REVERSE:
+        return ALPACA_TICKER_REVERSE[ticker]
+    
+    # Convert dots back to dashes for share classes
+    if '.' in ticker and len(ticker.split('.')[-1]) == 1:
+        return ticker.replace('.', '-')
+    
+    return ticker
+
+
+# =============================================================================
 # TRADING DAY UTILITIES
 # =============================================================================
 
