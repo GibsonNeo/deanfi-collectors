@@ -5,6 +5,27 @@ This document tracks all implementations, changes, and updates to the DeanFi Col
 
 # DeanFi Collectors - Changelog and Implementation Log
 
+## 2025-12-17: Stock Whale Workflow Fix - Output Directory
+
+### Summary
+Fixed GitHub Actions workflow and script to match the options-whales pattern for consistency.
+
+### Problem
+The stock whale collector script was defaulting to `../../../deanfi-data/stock-whales` (relative from script location), but in GitHub Actions, deanfi-data is checked out to `data-cache/`. The options-whales script defaults to outputting locally to its own directory, then the workflow copies files to data-cache.
+
+### Solution
+Updated both files to match the options-whales pattern:
+1. Script now defaults to outputting to `stockwhales/` (same directory as script)
+2. Workflow copies `stockwhales/*.json` to `data-cache/stock-whales/`
+
+### Files Changed
+| File | Change |
+|------|--------|
+| `stockwhales/fetch_stock_whales.py` | Changed default output to `Path(__file__).parent` |
+| `.github/workflows/stock-whales.yml` | Removed `--output-dir`, added copy step matching options-whales |
+
+---
+
 ## 2025-12-17: Stock Whale Collector - GitHub Actions Workflow
 
 ### Summary

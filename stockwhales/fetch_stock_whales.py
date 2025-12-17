@@ -894,8 +894,8 @@ def main():
     if args.output_dir:
         output_dir = Path(args.output_dir)
     else:
-        # Default to deanfi-data/stock-whales
-        output_dir = Path(__file__).parent.parent.parent / "deanfi-data" / "stock-whales"
+        # Default to current script directory (same as optionswhales pattern)
+        output_dir = Path(__file__).parent
     
     output_dir.mkdir(parents=True, exist_ok=True)
     
