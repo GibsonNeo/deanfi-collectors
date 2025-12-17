@@ -14,7 +14,7 @@ on:
       test_mode:
         description: 'Run in test mode (5 sample tickers only)'
         required: false
-        default: 'false'
+        default: false
         type: boolean
       lookback_days:
         description: 'Number of trading days to look back'
@@ -46,7 +46,7 @@ jobs:
         with:
           repository: ${{ env.DATA_REPO }}
           token: ${{ secrets.DATA_REPO_TOKEN }}
-          path: data-repo
+          path: data-cache
       
       - name: Set up Python
         uses: actions/setup-python@v4
@@ -57,15 +57,12 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements.txt
       
-      - name: Create output directory
-        run: mkdir -p data-repo/options-whales
-      
       - name: Fetch options whale trades
         run: |
           cd optionswhales
           
-          # Build command with output directory and optional flags
-          CMD="python fetch_options_whales.py --output-dir ../data-repo/options-whales"
+          # Build command with optional flags
+          CMD="python fetch_options_whales.py"
           
           if [ "${{ inputs.test_mode }}" = "true" ]; then
             CMD="$CMD --test"
@@ -80,26 +77,28 @@ jobs:
           echo "🐋 Starting options whale collection..."
           $CMD
           echo "✅ Options whale collection complete"
-          
-          # Verify output
+      
+      - name: Copy output to data repo
+        run: |
+          mkdir -p data-cache/options-whales
+          cp optionswhales/*.json data-cache/options-whales/ 2>/dev/null || echo "No JSON files found in optionswhales/"
           echo "📦 Output files:"
-          ls -la ../data-repo/options-whales/
+          ls -la data-cache/options-whales/
       
       - name: Commit and push to data repo
         run: |
-          cd data-repo
+          cd data-cache
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add options-whales/
           
-          # Check if there are changes
-          if [ -n "$(git status --porcelain options-whales/)" ]; then
-            git add options-whales/
-            
+          if git diff --staged --quiet; then
+            echo "No changes to commit"
+          else
             # Determine run type for commit message
             if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
               RUN_TYPE="manual"
             else
-              # Check if this is the noon or 9pm run based on current hour
               HOUR=$(date -u +%H)
               if [ "$HOUR" -ge "15" ] && [ "$HOUR" -le "18" ]; then
                 RUN_TYPE="mid-market"
@@ -108,35 +107,32 @@ jobs:
               fi
             fi
             
-            git commit -m "🐋 Options whale trades update ($RUN_TYPE)"
+            git commit -m "🐋 Options whale trades update ($RUN_TYPE) - $(date -u +'%Y-%m-%d %H:%M UTC')"
+            git pull --rebase origin main
             git push
             echo "✅ Changes pushed to data repo"
-          else
-            echo "ℹ️ No changes to commit"
           fi
       
       - name: Summary
+        if: always()
         run: |
           echo "## 🐋 Options Whale Collection Summary" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          
-          if [ -f "data-repo/options-whales/options_whale_summary.json" ]; then
-            # Extract summary stats using Python
-            python3 << 'EOF' >> $GITHUB_STEP_SUMMARY
-import json
-with open('data-repo/options-whales/options_whale_summary.json') as f:
-    data = json.load(f)
-
-meta = data.get('metadata', {})
-sentiment = data.get('overall_sentiment', {})
-
-print(f"- **Tickers Scanned**: {meta.get('tickers_scanned', 'N/A')}")
-print(f"- **Tickers with Whales**: {meta.get('tickers_with_whales', 'N/A')}")
-print(f"- **Total Whale Trades**: {meta.get('total_whale_trades', 'N/A')}")
-print(f"- **Sweeps Detected**: {meta.get('sweeps_detected', 'N/A')}")
-print(f"- **Overall Sentiment**: {sentiment.get('direction', 'N/A')}")
-print(f"- **Call/Put Ratio**: {sentiment.get('call_put_ratio', 'N/A')}")
-EOF
+          if [ -f "data-cache/options-whales/options_whale_summary.json" ]; then
+            echo "- **Generated**: $(date -u +'%Y-%m-%d %H:%M UTC')" >> $GITHUB_STEP_SUMMARY
+            # Extract stats using jq-style parsing
+            TICKERS=$(python3 -c "import json; d=json.load(open('data-cache/options-whales/options_whale_summary.json')); print(d.get('metadata',{}).get('tickers_scanned','N/A'))")
+            WHALES=$(python3 -c "import json; d=json.load(open('data-cache/options-whales/options_whale_summary.json')); print(d.get('metadata',{}).get('tickers_with_whales','N/A'))")
+            TRADES=$(python3 -c "import json; d=json.load(open('data-cache/options-whales/options_whale_summary.json')); print(d.get('metadata',{}).get('total_whale_trades','N/A'))")
+            SWEEPS=$(python3 -c "import json; d=json.load(open('data-cache/options-whales/options_whale_summary.json')); print(d.get('metadata',{}).get('sweeps_detected','N/A'))")
+            SENTIMENT=$(python3 -c "import json; d=json.load(open('data-cache/options-whales/options_whale_summary.json')); print(d.get('overall_sentiment',{}).get('direction','N/A'))")
+            RATIO=$(python3 -c "import json; d=json.load(open('data-cache/options-whales/options_whale_summary.json')); print(d.get('overall_sentiment',{}).get('call_put_ratio','N/A'))")
+            echo "- **Tickers Scanned**: $TICKERS" >> $GITHUB_STEP_SUMMARY
+            echo "- **Tickers with Whales**: $WHALES" >> $GITHUB_STEP_SUMMARY
+            echo "- **Total Whale Trades**: $TRADES" >> $GITHUB_STEP_SUMMARY
+            echo "- **Sweeps Detected**: $SWEEPS" >> $GITHUB_STEP_SUMMARY
+            echo "- **Overall Sentiment**: $SENTIMENT" >> $GITHUB_STEP_SUMMARY
+            echo "- **Call/Put Ratio**: $RATIO" >> $GITHUB_STEP_SUMMARY
           else
             echo "⚠️ Summary file not found" >> $GITHUB_STEP_SUMMARY
           fi

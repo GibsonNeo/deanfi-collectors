@@ -744,7 +744,8 @@ def main():
     if args.output_dir:
         output_dir = Path(args.output_dir)
     else:
-        output_dir = Path(__file__).parent.parent.parent / "deanfi-data" / "options-whales"
+        # Default to local directory (for GitHub Actions workflow compatibility)
+        output_dir = Path(__file__).parent
     
     output_dir.mkdir(parents=True, exist_ok=True)
     
