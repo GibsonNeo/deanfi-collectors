@@ -60,25 +60,25 @@ ticker_size:
     mid: 1.0     # Standard threshold (default)
     small: 0.5   # Less liquid names
   
-  # Explicit ticker classifications (others default to 'mid')
-  classifications:
-    # Mega caps (2x threshold)
-    SPY: mega
-    QQQ: mega
-    IWM: mega
-    AAPL: mega
-    MSFT: mega
-    GOOGL: mega
-    AMZN: mega
-    META: mega
-    # Large caps (1.5x threshold)
-    NVDA: large
-    TSLA: large
-    AMD: large
-    NFLX: large
-    JPM: large
-    V: large
-    MA: large
+  # # Explicit ticker classifications (others default to 'mid')
+  # classifications:
+  #   # Mega caps (2x threshold)
+  #   SPY: mega
+  #   QQQ: mega
+  #   IWM: mega
+  #   AAPL: mega
+  #   MSFT: mega
+  #   GOOGL: mega
+  #   AMZN: mega
+  #   META: mega
+  #   # Large caps (1.5x threshold)
+  #   NVDA: large
+  #   TSLA: large
+  #   AMD: large
+  #   NFLX: large
+  #   JPM: large
+  #   V: large
+  #   MA: large
 
 # Sweep Detection Settings
 # ------------------------

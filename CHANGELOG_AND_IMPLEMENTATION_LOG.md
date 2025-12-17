@@ -5,6 +5,33 @@ This document tracks all implementations, changes, and updates to the DeanFi Col
 
 # DeanFi Collectors - Changelog and Implementation Log
 
+## 2025-12-17: Options Whale Collector - File Size Fix
+
+### Problem
+First production run of options whale collector generated a 134MB JSON file that exceeded GitHub's 100MB limit. Investigation revealed:
+1. **Sweep detection on ALL trades**: Was analyzing `all_otm_trades + all_atm_trades` (hundreds of thousands of raw trades over 5 days)
+2. **156,267 sweeps stored**: Full sweep objects with trade_ids arrays stored in JSON
+3. **Raw trade accumulation**: Storing every fetched trade, not just whale trades above threshold
+
+### Solution
+Optimized to only store whale trades above threshold:
+1. **Sweeps on whale trades only**: Changed `detect_sweeps()` to analyze only the filtered whale trades (~450) instead of all raw trades
+2. **Removed raw trade storage**: Eliminated `all_otm_trades` and `all_atm_trades` accumulator lists
+3. **Compact trade format**: Trades JSON now stores minimal fields per trade (contract, type, strike, expiration, dte, premium, contracts, tier, timestamp)
+4. **Sweep summary only**: Replaced full `"sweeps"` array with `"sweeps_summary"` containing counts, premiums, and top 10 sweeps in compact format
+
+### Result
+| Metric | Before | After | Improvement |
+|--------|--------|-------|-------------|
+| Trades JSON size | 134 MB | ~126 KB | **1000x smaller** |
+| Sweeps detected | 156,267 | ~10-50 | From all trades → whale trades only |
+| GitHub push | ❌ Rejected | ✅ Works | Under 100MB limit |
+
+### Files Modified
+- `optionswhales/fetch_options_whales.py`: Sweep detection logic, trade storage, JSON structure
+
+---
+
 ## 2025-12-17: Options Whale Trades Collector
 
 ### Summary

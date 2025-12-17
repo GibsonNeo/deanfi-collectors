@@ -632,10 +632,13 @@ def build_trades_json(all_trades: Dict[str, List[Dict]],
     """
     Build the trades JSON output.
     
+    Only stores whale trades (above threshold) - no raw trade data.
+    Sweeps are summarized, not stored in full.
+    
     Args:
-        all_trades: Dictionary mapping ticker to list of whale trades
+        all_trades: Dictionary mapping ticker to list of whale trades (already filtered)
         ticker_thresholds: Dictionary mapping ticker to effective threshold
-        sweeps: List of detected sweeps
+        sweeps: List of detected sweeps (from whale trades only)
         metadata: Collection metadata
         config: Configuration dictionary
         
@@ -658,6 +661,26 @@ def build_trades_json(all_trades: Dict[str, List[Dict]],
         # Sort trades by premium descending
         sorted_trades = sorted(trades, key=lambda x: x['premium'], reverse=True)
         
+        # Compact trade format - remove verbose fields
+        compact_trades = []
+        for t in sorted_trades:
+            compact_trade = {
+                "contract": t.get('contract'),
+                "type": t.get('type'),
+                "strike": t.get('strike'),
+                "expiration": t.get('expiration'),
+                "dte": t.get('dte'),
+                "premium": t.get('premium'),
+                "contracts": t.get('contracts'),
+                "tier": t.get('tier_label', t.get('tier')),
+                "timestamp": t.get('timestamp'),
+            }
+            # Only include sweep info if trade is part of a sweep
+            if t.get('is_sweep'):
+                compact_trade['is_sweep'] = True
+                compact_trade['sweep_id'] = t.get('sweep_id')
+            compact_trades.append(compact_trade)
+        
         by_ticker[ticker] = {
             "sentiment": sentiment['direction'],
             "call_premium": sentiment['call_premium'],
@@ -668,13 +691,39 @@ def build_trades_json(all_trades: Dict[str, List[Dict]],
             "sector": TICKER_TO_SECTOR.get(ticker, "Unknown"),
             "ticker_size": size_class,
             "effective_threshold": ticker_thresholds.get(ticker, config['thresholds']['minimum_threshold']),
-            "trades": sorted_trades
+            "trades": compact_trades
         }
+    
+    # Build sweep summary (don't store full sweep details, just counts and top sweeps)
+    bullish_sweeps = [s for s in sweeps if s['sentiment'] == 'BULLISH']
+    bearish_sweeps = [s for s in sweeps if s['sentiment'] == 'BEARISH']
+    
+    # Top 10 sweeps by premium (compact format)
+    top_sweeps = []
+    for s in sorted(sweeps, key=lambda x: x['total_premium'], reverse=True)[:10]:
+        top_sweeps.append({
+            "underlying": s['underlying'],
+            "legs": s['legs'],
+            "total_premium": s['total_premium'],
+            "total_contracts": s['total_contracts'],
+            "sentiment": s['sentiment'],
+            "strikes": s['strikes'][:5] if len(s['strikes']) > 5 else s['strikes'],  # Limit strikes shown
+        })
+    
+    sweeps_summary = {
+        "total_count": len(sweeps),
+        "total_premium": sum(s['total_premium'] for s in sweeps),
+        "bullish_count": len(bullish_sweeps),
+        "bullish_premium": sum(s['total_premium'] for s in bullish_sweeps),
+        "bearish_count": len(bearish_sweeps),
+        "bearish_premium": sum(s['total_premium'] for s in bearish_sweeps),
+        "top_sweeps": top_sweeps
+    }
     
     return {
         "_README": generate_readme_section(config),
         "metadata": metadata,
-        "sweeps": sweeps,
+        "sweeps_summary": sweeps_summary,
         "by_ticker": by_ticker
     }
 
@@ -721,10 +770,8 @@ def collect_options_whales(tickers: List[str], config: Dict,
     print(f"{'='*60}\n")
     
     # Collect trades for each ticker
-    all_trades = {}
+    all_trades = {}  # Only stores whale trades above threshold
     ticker_thresholds = {}
-    all_otm_trades = []
-    all_atm_trades = []
     
     tickers_with_whales = 0
     total_whale_trades = 0
@@ -751,11 +798,8 @@ def collect_options_whales(tickers: List[str], config: Dict,
             )
             
             # Convert ticker back to standard format in trade records
-            for trade in otm_trades + atm_trades:
+            for trade in otm_trades:
                 trade['underlying'] = display_ticker
-            
-            all_otm_trades.extend(otm_trades)
-            all_atm_trades.extend(atm_trades)
             
             if otm_trades:
                 # Apply dynamic threshold
@@ -782,15 +826,18 @@ def collect_options_whales(tickers: List[str], config: Dict,
             else:
                 print(f"error: {error_msg[:50]}")
     
-    # Detect sweeps from all OTM + ATM trades
-    print(f"\nDetecting sweeps...")
-    combined_for_sweeps = all_otm_trades + all_atm_trades
+    # Detect sweeps from WHALE trades only (trades above threshold)
+    print(f"\nDetecting sweeps among whale trades...")
+    whale_trades_flat = []
+    for ticker_trades in all_trades.values():
+        whale_trades_flat.extend(ticker_trades)
+    
     sweeps = detect_sweeps(
-        combined_for_sweeps,
+        whale_trades_flat,
         config['sweeps']['time_window_seconds'],
         config['sweeps']['min_legs']
     )
-    print(f"Found {len(sweeps)} sweeps")
+    print(f"Found {len(sweeps)} sweeps among {len(whale_trades_flat)} whale trades")
     
     # Update trades with sweep info
     sweep_trade_ids = set()
