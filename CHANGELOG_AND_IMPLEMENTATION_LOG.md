@@ -32,6 +32,11 @@ This aligns the time series with how the dashboard is used: today's levels are a
 Added config knob:
 - `collector.history_sessions` (default 252)
 
+### 2025-12-20 (Update): Increase lookback for SMA200-ready history
+Adjusted the collector lookback behavior to ensure enough prior daily bars are fetched so `history.daily[]` includes usable SMA200 values across the displayed history window.
+- Config default `collector.lookback_days` increased to ~2 calendar years.
+- Code enforces a minimum lookback derived from `history_sessions + 200` (plus a small buffer).
+
 ### Data Source
 - Alpaca Market Data API: `GET https://data.alpaca.markets/v2/stocks/bars`
 

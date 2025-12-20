@@ -9,8 +9,9 @@ api:
 collector:
   tickers: ["SPY", "QQQ", "IWM", "DIA"]
   timeframe: "1Day"
-  # We need >=200 daily closes to compute SMA200. This is a safety buffer.
-  lookback_days: 420
+  # We need enough prior daily closes to compute SMA200 across the displayed history window.
+  # For ~1Y (252 sessions) + SMA200, this typically requires ~2 calendar years.
+  lookback_days: 760
   # Number of historical sessions to include for charting (approx 1 trading year).
   history_sessions: 252
   max_bars_limit: 1000

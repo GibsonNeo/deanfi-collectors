@@ -399,8 +399,17 @@ def main() -> int:
     headers = alpaca_headers(api_key, api_secret)
 
     # Use a date-only interval for daily bars. End is inclusive in the API.
+    #
+    # SMA200 for a given session date D uses closes through the prior session (D-1).
+    # To have SMA200 available throughout a displayed N-session history window, we need to fetch
+    # roughly N + 200 completed bars (plus a small buffer) before slicing.
+    required_trading_bars = history_sessions + 200 + 5
+    required_calendar_days = int((required_trading_bars * 365.0) / 252.0) + 45
+
+    effective_lookback_days = max(lookback_days, required_calendar_days)
+
     now_utc = datetime.now(timezone.utc)
-    start_dt = (now_utc - timedelta(days=lookback_days)).date().isoformat()
+    start_dt = (now_utc - timedelta(days=effective_lookback_days)).date().isoformat()
     end_dt = now_utc.date().isoformat()
 
     rate_limiter = RateLimiter(rate_limit_per_minute)
@@ -507,7 +516,7 @@ def main() -> int:
             "tickers": tickers,
             "tickers_count": len(tickers),
             "symbols_with_data": len(data),
-            "lookback_days": lookback_days,
+            "lookback_days": effective_lookback_days,
             "history_sessions": history_sessions,
             "errors": errors,
         },
