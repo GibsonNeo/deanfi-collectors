@@ -55,13 +55,75 @@ def export_housing_affordability_json(output_path: str, config_path: str = None,
         if indicator.is_derived:
             continue
         print(f"  Fetching {indicator.series_id} ({indicator.name})...")
-        df = fred.get_series_range(indicator.series_id, start_date_str, end_date_str)
-        indicator_data[indicator.series_id] = df
+        try:
+            df = fred.get_series_range(indicator.series_id, start_date_str, end_date_str)
+            indicator_data[indicator.series_id] = df
+        except Exception as fetch_error:
+            print(f"  Warning: Failed to fetch {indicator.series_id}: {fetch_error}")
+            indicator_data[indicator.series_id] = None
 
     eastern = ZoneInfo("America/New_York")
     now = datetime.now(eastern)
 
+    readme = {
+        "title": "Housing & Affordability Dashboard",
+        "description": "Housing activity, home prices, financing costs, and household affordability metrics from FRED.",
+        "purpose": "Summarize housing supply/demand health and borrower cost pressure for macro monitoring and market commentary.",
+        "metrics_explained": {
+            "HOUST": {
+                "description": "New privately-owned housing units started (construction pipeline).",
+                "interpretation": "Higher starts signal growing supply; sustained drops can flag builder pullback."
+            },
+            "PERMIT": {
+                "description": "Housing units authorized by permits (leading indicator for future starts).",
+                "interpretation": "Permits tend to turn before starts; falling permits often precede slower construction."
+            },
+            "HSN1F": {
+                "description": "New single-family houses sold (demand for new construction).",
+                "interpretation": "Rising sales point to healthy builder demand; sharp drops can warn of demand softening."
+            },
+            "EXHOSLUSM495S": {
+                "description": "Existing single-family home sales (resale market volume).",
+                "interpretation": "Higher turnover suggests active resale demand; low volumes can reflect tight inventory or weak demand."
+            },
+            "CSUSHPINSA": {
+                "description": "S&P/Case-Shiller U.S. National Home Price Index (broad home price level).",
+                "interpretation": "Higher is not always better; fast price gains can worsen affordability while broad declines can signal stress."
+            },
+            "MORTGAGE30US": {
+                "description": "Average 30-year fixed mortgage rate (weekly).",
+                "interpretation": "Lower rates improve monthly payments and refinance ability; rapid increases pressure affordability."
+            },
+            "MORTGAGE15US": {
+                "description": "Average 15-year fixed mortgage rate (weekly).",
+                "interpretation": "Tracks shorter-term mortgage pricing; helpful for refinance affordability comparisons."
+            },
+            "TDSP": {
+                "description": "Household debt service payments as a percent of disposable personal income.",
+                "interpretation": "Lower ratios indicate more cushion for debt service; rising ratios tighten household cash flow."
+            },
+            "MDSP": {
+                "description": "Mortgage debt service payments as a percent of disposable personal income.",
+                "interpretation": "Direct affordability gauge for mortgage payments; rising values reduce affordability."
+            },
+            "T10YIE": {
+                "description": "10-year breakeven inflation rate (market-based inflation expectations).",
+                "interpretation": "Higher expectations can pressure mortgage rates and real affordability over time."
+            }
+        },
+        "trading_applications": {
+            "homebuilders": "Pair starts/permits/sales trends with mortgage rates to assess homebuilder earnings sensitivity.",
+            "macro_risk": "Use debt service ratios and breakeven inflation as affordability stress markers in macro risk dashboards."
+        },
+        "notes": {
+            "history_window": "20-year history (7300 days) for percentile grading.",
+            "grading": "Percentile grades use indicator interpretation (higher vs lower is better).",
+            "resampling": "Series are adaptively resampled to a storage-friendly cadence per frequency before history is saved."
+        }
+    }
+
     json_data = {
+        "_README": readme,
         "metadata": {
             "generated_at": now.isoformat(),
             "data_source": "FRED API",
@@ -87,7 +149,7 @@ def export_housing_affordability_json(output_path: str, config_path: str = None,
 
     for indicator in indicators:
         series_id = indicator.series_id
-        if series_id not in indicator_data or indicator_data[series_id].empty:
+        if series_id not in indicator_data or indicator_data[series_id] is None or indicator_data[series_id].empty:
             print(f"  Warning: No data for {series_id}")
             continue
 

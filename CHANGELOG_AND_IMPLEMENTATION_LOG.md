@@ -5,6 +5,37 @@ This document tracks all implementations, changes, and updates to the DeanFi Col
 
 ---
 
+## 2025-12-21: Consumer & Credit Inline README
+
+### Summary
+Added inline `_README` documentation to the consumer & credit collector output and added a collector README for clarity.
+
+### Files Updated
+- `consumercredit/fetch_consumer_credit.py` — emit `_README` with metric descriptions, uses, and notes (includes CONCCONF fallback note).
+- `consumercredit/consumer_credit.json` — aligned sample output with `_README` block.
+- `consumercredit/README.md` — new collector README covering indicators, grading, output structure, and run instructions.
+
+### Notes
+- Conference Board confidence (`CONCCONF`) continues to fall back to OECD consumer confidence (`CSCICP03USM665S`) when unavailable.
+
+---
+
+## 2025-12-21: Housing & Affordability Cleanup
+
+### Summary
+Removed the unavailable NAHB/Wells Fargo Housing Market Index (HMI) series from the housing affordability collector and added inline dataset documentation.
+
+### Files Updated
+- `shared/economy_indicators.py` — removed `HMI` from the housing/affordability indicator list.
+- `housingaffordability/fetch_housing_affordability.py` — added `_README` documentation to emitted JSON.
+- `housingaffordability/housing_affordability.json` — aligned saved output with new indicator set and `_README` block.
+- `housingaffordability/README.md` — new collector README covering indicators, grading, output structure, and run instructions.
+
+### Notes
+- HMI is not available via FRED API (returns 400), so it is excluded until a valid replacement series is identified.
+
+---
+
 ## 2025-12-21: Consumer & Credit + Housing & Affordability Collectors
 
 ### Summary

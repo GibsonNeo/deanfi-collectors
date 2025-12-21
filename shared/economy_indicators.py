@@ -441,15 +441,6 @@ HOUSING_AFFORDABILITY_INDICATORS = [
         interpretation="higher_is_better"
     ),
     IndicatorDefinition(
-        series_id="HMI",
-        name="NAHB/Wells Fargo Housing Market Index",
-        description="Builder confidence index for single-family housing",
-        frequency="Monthly",
-        seasonal_adjustment="NSA",
-        unit="Index",
-        interpretation="higher_is_better"
-    ),
-    IndicatorDefinition(
         series_id="CSUSHPINSA",
         name="S&P/Case-Shiller U.S. National Home Price Index",
         description="Broad measure of U.S. home prices",

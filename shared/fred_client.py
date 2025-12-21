@@ -73,8 +73,13 @@ class FREDClient:
         params["file_type"] = "json"
         
         response = self.session.get(url, params=params, timeout=timeout)
-        response.raise_for_status()
-        
+        if response.status_code >= 400:
+            # Include response text for easier debugging of API errors.
+            raise requests.HTTPError(
+                f"FRED API error {response.status_code} for {endpoint} with params {params}: {response.text}",
+                response=response,
+            )
+
         return response.json()
     
     def get_series_info(self, series_id: str) -> Dict[str, Any]:

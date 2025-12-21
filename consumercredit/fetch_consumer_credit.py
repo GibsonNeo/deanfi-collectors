@@ -56,13 +56,93 @@ def export_consumer_credit_json(output_path: str, config_path: str = None, overr
         if indicator.is_derived:
             continue
         print(f"  Fetching {indicator.series_id} ({indicator.name})...")
-        df = fred.get_series_range(indicator.series_id, start_date_str, end_date_str)
-        indicator_data[indicator.series_id] = df
+        try:
+            df = fred.get_series_range(indicator.series_id, start_date_str, end_date_str)
+            indicator_data[indicator.series_id] = df
+        except Exception as fetch_error:
+            # Log and continue so a single series failure doesn't abort the export.
+            print(f"  Warning: Failed to fetch {indicator.series_id}: {fetch_error}")
+
+            # Fallback: For Conference Board Consumer Confidence, try OECD consumer confidence as backup.
+            if indicator.series_id == "CONCCONF":
+                fallback_id = "CSCICP03USM665S"  # OECD Consumer Confidence Index for US
+                print(f"  Attempting fallback series {fallback_id} (OECD Consumer Confidence)...")
+                try:
+                    df_fallback = fred.get_series_range(fallback_id, start_date_str, end_date_str)
+                    indicator_data[indicator.series_id] = df_fallback
+                    print(f"  Fallback {fallback_id} fetched successfully")
+                except Exception as fallback_error:
+                    print(f"  Warning: Fallback {fallback_id} also failed: {fallback_error}")
+                    indicator_data[indicator.series_id] = None
+            else:
+                indicator_data[indicator.series_id] = None
 
     eastern = ZoneInfo("America/New_York")
     now = datetime.now(eastern)
 
+    readme = {
+        "title": "Consumer & Credit Dashboard",
+        "description": "Consumer sentiment, spending, saving, and credit balance indicators from FRED with percentile grading.",
+        "purpose": "Track household demand strength and credit conditions for macro monitoring and risk dashboards.",
+        "metrics_explained": {
+            "UMCSENT": {
+                "description": "University of Michigan consumer sentiment (headline index).",
+                "interpretation": "Higher sentiment signals confidence in spending and income outlook."
+            },
+            "CONCCONF": {
+                "description": "Conference Board consumer confidence (1985=100). Fallback to OECD consumer confidence when unavailable.",
+                "interpretation": "Higher readings align with stronger consumer demand; persistent drops can precede spending slowdowns."
+            },
+            "RSAFS": {
+                "description": "Advance retail and food services sales (nominal, SA).",
+                "interpretation": "Higher nominal sales show demand breadth; monitor alongside real sales for inflation effects."
+            },
+            "RRSFS": {
+                "description": "Real retail and food services sales (inflation-adjusted, SA).",
+                "interpretation": "Real growth confirms volume strength beyond price effects; weakness can flag demand softening."
+            },
+            "RSXFS": {
+                "description": "Retail sales excluding motor vehicles and parts (nominal, SA).",
+                "interpretation": "Strips autos to gauge core discretionary demand; trends often smoother than headline retail."
+            },
+            "PCE": {
+                "description": "Personal consumption expenditures (nominal, SAAR).",
+                "interpretation": "Broad nominal spending; rising values indicate stronger aggregate demand."
+            },
+            "PCEC96": {
+                "description": "Real personal consumption expenditures (chained 2017 dollars, SAAR).",
+                "interpretation": "Volume-based view of consumption; key for GDP contribution and real demand strength."
+            },
+            "PSAVERT": {
+                "description": "Personal saving rate (% of disposable income, SA).",
+                "interpretation": "Higher saving improves resilience but can coincide with slower spending; very low levels reduce cushion."
+            },
+            "TOTALSL": {
+                "description": "Total consumer credit outstanding (SA).",
+                "interpretation": "Neutral by default; rapid growth can imply rising leverage, contraction can imply tightening or deleveraging."
+            },
+            "REVOLSL": {
+                "description": "Revolving consumer credit (credit cards, SA).",
+                "interpretation": "Rising balances may reflect confidence or stress; watch alongside delinquency metrics."
+            },
+            "NONREVSL": {
+                "description": "Nonrevolving consumer credit (installment/auto/student, SA).",
+                "interpretation": "Growth signals credit expansion; slowing or declines can reflect tighter lending or reduced demand."
+            }
+        },
+        "trading_applications": {
+            "consumer_equities": "Pair sentiment and real sales trends with sector earnings to gauge demand sensitivity.",
+            "credit_risk": "Use revolving/nonrevolving growth vs saving rate as a quick leverage/stress pulse for consumer credit exposure."
+        },
+        "notes": {
+            "history_window": "20-year history (7300 days) for percentile grading.",
+            "fallbacks": "CONCCONF falls back to OECD consumer confidence (CSCICP03USM665S) if unavailable.",
+            "resampling": "Series are adaptively resampled per frequency before storing history."
+        }
+    }
+
     json_data = {
+        "_README": readme,
         "metadata": {
             "generated_at": now.isoformat(),
             "data_source": "FRED API",
@@ -88,7 +168,7 @@ def export_consumer_credit_json(output_path: str, config_path: str = None, overr
 
     for indicator in indicators:
         series_id = indicator.series_id
-        if series_id not in indicator_data or indicator_data[series_id].empty:
+        if series_id not in indicator_data or indicator_data[series_id] is None or indicator_data[series_id].empty:
             print(f"  Warning: No data for {series_id}")
             continue
 
