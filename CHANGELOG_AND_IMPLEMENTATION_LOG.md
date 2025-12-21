@@ -5,6 +5,35 @@ This document tracks all implementations, changes, and updates to the DeanFi Col
 
 ---
 
+## 2025-12-21: Consumer & Credit + Housing & Affordability Collectors
+
+### Summary
+Added two new FRED-based economy collectors covering consumer demand/credit and housing/affordability with 20-year lookbacks, percentile grading, and adaptive resampling.
+
+### Files Created
+- `consumercredit/config.yml`
+- `consumercredit/fetch_consumer_credit.py`
+- `housingaffordability/config.yml`
+- `housingaffordability/fetch_housing_affordability.py`
+
+### Files Updated
+- `shared/economy_indicators.py` — added Consumer & Credit and Housing & Affordability indicator definitions and category mapping.
+- `README.md` — documented new collectors in the data collectors table.
+
+### Indicators (high level)
+- Consumer & Credit: UMCSENT, CONCCONF, RSAFS, RRSFS, RSXFS, PCE, PCEC96, PSAVERT, TOTALSL, REVOLSL, NONREVSL.
+- Housing & Affordability: HOUST, PERMIT, HSN1F, EXHOSLUSM495S, HMI, CSUSHPINSA, MORTGAGE30US, MORTGAGE15US, TDSP, MDSP, T10YIE.
+
+### Output Paths
+- `consumer_credit.json`
+- `housing_affordability.json`
+
+### Notes
+- Both collectors fetch 20 years of history for grading and use shared grading/trend/change metrics.
+- Summary copy aligns with existing economy dashboards for consistent UX.
+
+---
+
 ## 2025-12-20: Support / Resistence Collector (Pivots + SMAs)
 
 ### Summary

@@ -67,14 +67,30 @@ jobs:
           cd moneymarkets
           python fetch_money_markets.py
           echo "✅ Money markets data fetched"
+
+      - name: Fetch consumer & credit data
+        run: |
+          cd consumercredit
+          python fetch_consumer_credit.py
+          echo "✅ Consumer & credit data fetched"
+
+      - name: Fetch housing & affordability data
+        run: |
+          cd housingaffordability
+          python fetch_housing_affordability.py
+          echo "✅ Housing & affordability data fetched"
       
       - name: Copy to data repo
         run: |
           mkdir -p data-cache/economy-breadth
+          mkdir -p data-cache/consumer-credit
+          mkdir -p data-cache/housing-affordability
           cp growthoutput/growth_output.json data-cache/economy-breadth/
           cp inflationprices/inflation_prices.json data-cache/economy-breadth/
           cp laboremployment/labor_employment.json data-cache/economy-breadth/
           cp moneymarkets/money_markets.json data-cache/economy-breadth/
+          cp consumercredit/consumer_credit.json data-cache/consumer-credit/
+          cp housingaffordability/housing_affordability.json data-cache/housing-affordability/
           echo "✅ All economy files copied to data repo"
       
       - name: Commit and push
@@ -82,7 +98,7 @@ jobs:
           cd data-cache
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add economy-breadth/
+          git add economy-breadth/ consumer-credit/ housing-affordability/
           
           if git diff --staged --quiet; then
             echo "No changes to commit"

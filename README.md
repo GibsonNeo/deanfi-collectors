@@ -24,6 +24,8 @@ Python-based data collectors that fetch earnings, news, analyst trends, and mark
 | **Inflation & Prices** | CPI, PCE, PPI, breakeven inflation | Daily (12pm ET Mon-Fri) | FRED |
 | **Labor & Employment** | Unemployment, payrolls, wages, job openings | Daily (12pm ET Mon-Fri) | FRED |
 | **Money & Markets** | Fed funds, Treasuries, yield spread, M2 | Daily (12pm ET Mon-Fri) | FRED |
+| **Consumer & Credit** | Sentiment, retail sales, saving rate, revolving/nonrevolving credit | Daily (12pm ET Mon-Fri) | FRED |
+| **Housing & Affordability** | Housing activity, home prices, mortgage rates, debt service, affordability | Daily (12pm ET Mon-Fri) | FRED |
 | **Mean Reversion** | Price vs MA metrics + MA spreads with z-scores | Every 10 min (market hours) | Yahoo Finance |
 | **Options Whales** | Large OTM options trades with sweep detection | Twice daily (12pm & 9pm ET) | Alpaca Markets |
 | **Stock Whales** | Large stock trades with dark pool detection | Twice daily (12pm & 9pm ET) | Alpaca Markets |

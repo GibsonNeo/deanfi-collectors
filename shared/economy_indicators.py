@@ -292,12 +292,228 @@ MONEY_MARKETS_INDICATORS = [
 ]
 
 
+# ============================================================================
+# CONSUMER & CREDIT INDICATORS
+# ============================================================================
+
+CONSUMER_CREDIT_INDICATORS = [
+    IndicatorDefinition(
+        series_id="UMCSENT",
+        name="University of Michigan Consumer Sentiment Index",
+        description="Consumer sentiment survey measuring economic outlook",
+        frequency="Monthly",
+        seasonal_adjustment="NSA",
+        unit="Index 1966Q1=100",
+        interpretation="higher_is_better"
+    ),
+    IndicatorDefinition(
+        series_id="CONCCONF",
+        name="Conference Board Consumer Confidence Index",
+        description="Consumer confidence index benchmarked to 1985=100",
+        frequency="Monthly",
+        seasonal_adjustment="NSA",
+        unit="Index 1985=100",
+        interpretation="higher_is_better"
+    ),
+    IndicatorDefinition(
+        series_id="RSAFS",
+        name="Advance Retail Sales",
+        description="Advance estimates of U.S. retail and food services sales",
+        frequency="Monthly",
+        seasonal_adjustment="SA",
+        unit="Millions of Dollars",
+        interpretation="higher_is_better"
+    ),
+    IndicatorDefinition(
+        series_id="RRSFS",
+        name="Real Retail & Food Services Sales",
+        description="Inflation-adjusted retail and food services sales",
+        frequency="Monthly",
+        seasonal_adjustment="SA",
+        unit="Millions of Chained 2017 Dollars",
+        interpretation="higher_is_better"
+    ),
+    IndicatorDefinition(
+        series_id="RSXFS",
+        name="Retail Sales ex Autos",
+        description="Retail and food services sales excluding motor vehicles and parts",
+        frequency="Monthly",
+        seasonal_adjustment="SA",
+        unit="Millions of Dollars",
+        interpretation="higher_is_better"
+    ),
+    IndicatorDefinition(
+        series_id="PCE",
+        name="Personal Consumption Expenditures",
+        description="Nominal personal consumption expenditures (annualized)",
+        frequency="Monthly",
+        seasonal_adjustment="SAAR",
+        unit="Billions of Dollars",
+        interpretation="higher_is_better"
+    ),
+    IndicatorDefinition(
+        series_id="PCEC96",
+        name="Real Personal Consumption Expenditures",
+        description="Inflation-adjusted personal consumption expenditures (annualized)",
+        frequency="Monthly",
+        seasonal_adjustment="SAAR",
+        unit="Billions of Chained 2017 Dollars",
+        interpretation="higher_is_better"
+    ),
+    IndicatorDefinition(
+        series_id="PSAVERT",
+        name="Personal Saving Rate",
+        description="Personal saving as a percentage of disposable personal income",
+        frequency="Monthly",
+        seasonal_adjustment="SA",
+        unit="Percent",
+        interpretation="neutral"
+    ),
+    IndicatorDefinition(
+        series_id="TOTALSL",
+        name="Total Consumer Credit Outstanding",
+        description="Total household credit outstanding",
+        frequency="Monthly",
+        seasonal_adjustment="SA",
+        unit="Billions of Dollars",
+        interpretation="neutral"
+    ),
+    IndicatorDefinition(
+        series_id="REVOLSL",
+        name="Revolving Consumer Credit",
+        description="Revolving credit such as credit cards",
+        frequency="Monthly",
+        seasonal_adjustment="SA",
+        unit="Billions of Dollars",
+        interpretation="neutral"
+    ),
+    IndicatorDefinition(
+        series_id="NONREVSL",
+        name="Nonrevolving Consumer Credit",
+        description="Installment credit such as auto and student loans",
+        frequency="Monthly",
+        seasonal_adjustment="SA",
+        unit="Billions of Dollars",
+        interpretation="neutral"
+    ),
+]
+
+
+# ============================================================================
+# HOUSING & AFFORDABILITY INDICATORS
+# ============================================================================
+
+HOUSING_AFFORDABILITY_INDICATORS = [
+    IndicatorDefinition(
+        series_id="HOUST",
+        name="Housing Starts",
+        description="New privately-owned housing units started",
+        frequency="Monthly",
+        seasonal_adjustment="SAAR",
+        unit="Thousands of Units",
+        interpretation="higher_is_better"
+    ),
+    IndicatorDefinition(
+        series_id="PERMIT",
+        name="Building Permits",
+        description="New privately-owned housing units authorized by permits",
+        frequency="Monthly",
+        seasonal_adjustment="SAAR",
+        unit="Thousands of Units",
+        interpretation="higher_is_better"
+    ),
+    IndicatorDefinition(
+        series_id="HSN1F",
+        name="New One Family Houses Sold",
+        description="New single-family houses sold",
+        frequency="Monthly",
+        seasonal_adjustment="SAAR",
+        unit="Thousands of Units",
+        interpretation="higher_is_better"
+    ),
+    IndicatorDefinition(
+        series_id="EXHOSLUSM495S",
+        name="Existing Home Sales",
+        description="Existing single-family homes sold, seasonally adjusted annual rate",
+        frequency="Monthly",
+        seasonal_adjustment="SAAR",
+        unit="Thousands of Units",
+        interpretation="higher_is_better"
+    ),
+    IndicatorDefinition(
+        series_id="HMI",
+        name="NAHB/Wells Fargo Housing Market Index",
+        description="Builder confidence index for single-family housing",
+        frequency="Monthly",
+        seasonal_adjustment="NSA",
+        unit="Index",
+        interpretation="higher_is_better"
+    ),
+    IndicatorDefinition(
+        series_id="CSUSHPINSA",
+        name="S&P/Case-Shiller U.S. National Home Price Index",
+        description="Broad measure of U.S. home prices",
+        frequency="Monthly",
+        seasonal_adjustment="NSA",
+        unit="Index Jan 2000=100",
+        interpretation="neutral"
+    ),
+    IndicatorDefinition(
+        series_id="MORTGAGE30US",
+        name="30-Year Fixed Mortgage Rate",
+        description="Average 30-year fixed mortgage rate",
+        frequency="Weekly",
+        seasonal_adjustment="NSA",
+        unit="Percent",
+        interpretation="lower_is_better"
+    ),
+    IndicatorDefinition(
+        series_id="MORTGAGE15US",
+        name="15-Year Fixed Mortgage Rate",
+        description="Average 15-year fixed mortgage rate",
+        frequency="Weekly",
+        seasonal_adjustment="NSA",
+        unit="Percent",
+        interpretation="lower_is_better"
+    ),
+    IndicatorDefinition(
+        series_id="TDSP",
+        name="Household Debt Service Ratio",
+        description="Debt service payments as a percent of disposable personal income",
+        frequency="Quarterly",
+        seasonal_adjustment="SA",
+        unit="Percent",
+        interpretation="lower_is_better"
+    ),
+    IndicatorDefinition(
+        series_id="MDSP",
+        name="Mortgage Debt Service Payments to Disposable Income",
+        description="Mortgage debt service payments as a percent of disposable personal income",
+        frequency="Quarterly",
+        seasonal_adjustment="SA",
+        unit="Percent",
+        interpretation="lower_is_better"
+    ),
+    IndicatorDefinition(
+        series_id="T10YIE",
+        name="10-Year Breakeven Inflation Rate",
+        description="Market-based inflation expectations over 10 years",
+        frequency="Daily",
+        seasonal_adjustment="NSA",
+        unit="Percent",
+        interpretation="lower_is_better"
+    ),
+]
+
+
 # Category mapping
 INDICATOR_CATEGORIES = {
     "growth_output": GROWTH_OUTPUT_INDICATORS,
     "labor_employment": LABOR_EMPLOYMENT_INDICATORS,
     "inflation_prices": INFLATION_PRICES_INDICATORS,
     "money_markets": MONEY_MARKETS_INDICATORS,
+    "consumer_credit": CONSUMER_CREDIT_INDICATORS,
+    "housing_affordability": HOUSING_AFFORDABILITY_INDICATORS,
 }
 
 
