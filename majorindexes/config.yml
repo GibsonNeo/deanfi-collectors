@@ -3,6 +3,17 @@
 # Total: 98+ indices covering global markets, sectors, styles, commodities, and bonds
 
 # ==============================================================================
+# US MAJOR ETF PRICES (10-min snapshot)
+# ==============================================================================
+# Lightweight “current price only” snapshot for key market ETFs.
+# This is designed for easy reuse across site pages without needing to parse larger datasets.
+us_major_etf_prices:
+  description: "Current price snapshot for 4 major US market ETFs"
+  update_frequency: "Every 10 minutes during market hours"
+  output_file: "us_major_etf_prices.json"
+  tickers: ["SPY", "DIA", "IWM", "QQQ"]
+
+# ==============================================================================
 # US MAJOR INDICES (6 indices)
 # ==============================================================================
 us_major_indices:

@@ -20,6 +20,29 @@ Added inline `_README` documentation to the consumer & credit collector output a
 
 ---
 
+## 2025-12-22: Add 10-min US Major ETF Price Snapshot (SPY/DIA/IWM/QQQ)
+
+### Summary
+Added a lightweight JSON output to the existing 10-minute market-data workflow (via the major indexes collector run) to capture **current prices** for the four most-used broad-market ETFs: **SPY, DIA, IWM, QQQ**. This is intended for simple site widgets/pages that only need a current price without parsing larger datasets.
+
+### Output
+- `major-indexes/us_major_etf_prices.json`
+
+Schema (high level):
+- `metadata.generated_at`
+- `data.{TICKER}.price`
+- `data.{TICKER}.as_of` (UTC timestamp of the 5-minute bar used)
+
+### Files Updated
+- `majorindexes/config.yml` — new `us_major_etf_prices` config block (tickers + output filename)
+- `majorindexes/fetch_us_major.py` — emits `us_major_etf_prices.json` during the existing run
+
+### Notes
+- Uses `yfinance.download(..., interval="5m", period="2d")` and takes the most recent available close as the “current” price.
+- The high-frequency GitHub Actions workflow already copies `majorindexes/*.json` into `deanfi-data/major-indexes/`, so no workflow changes were required.
+
+---
+
 ## 2025-12-21: Housing & Affordability Cleanup
 
 ### Summary

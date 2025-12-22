@@ -22,6 +22,7 @@ import os
 import sys
 import argparse
 from pathlib import Path
+from typing import Dict, List, Optional
 
 # Add parent directory to path for shared modules
 sys.path.insert(0, str(Path(__file__).parent.parent))
@@ -39,7 +40,8 @@ from utils import (
     save_json,
     determine_market_sentiment,
     format_timestamp,
-    format_date
+    format_date,
+    safe_round
 )
 
 # Get script directory
@@ -52,6 +54,118 @@ with open(os.path.join(SCRIPT_DIR, 'config.yml'), 'r') as f:
 US_MAJOR_CONFIG = config['us_major_indices']
 INDICES = US_MAJOR_CONFIG['indices']
 HISTORICAL_DAYS = config['settings']['historical_days']
+
+ETF_PRICES_CONFIG = config.get('us_major_etf_prices', {})
+ETF_TICKERS: List[str] = list(ETF_PRICES_CONFIG.get('tickers') or ["SPY", "DIA", "IWM", "QQQ"])
+ETF_PRICES_OUTPUT_FILE: str = str(ETF_PRICES_CONFIG.get('output_file') or "us_major_etf_prices.json")
+
+
+def _timestamp_to_iso_utc(ts: pd.Timestamp) -> str:
+    """Convert a pandas timestamp to an ISO 8601 UTC string."""
+    if ts is None or pd.isna(ts):
+        return format_timestamp()
+    t = pd.Timestamp(ts)
+    if getattr(t, "tz", None) is not None:
+        t = t.tz_convert("UTC")
+    return t.strftime('%Y-%m-%dT%H:%M:%SZ')
+
+
+def fetch_latest_etf_prices(tickers: List[str]) -> Dict[str, Dict[str, Optional[float]]]:
+    """Fetch latest intraday close for provided tickers using yfinance.
+
+    Uses a short intraday window to get a near-real-time value without relying on the sometimes
+    brittle `Ticker.info` fields.
+    """
+    if not tickers:
+        return {}
+
+    # Use 5m bars for reliability and lower load; updated often enough for a 10-min cadence.
+    df = yf.download(
+        tickers=tickers,
+        period="2d",
+        interval="5m",
+        group_by="ticker",
+        auto_adjust=False,
+        progress=False,
+        threads=True,
+    )
+
+    if df is None or df.empty:
+        return {t: {"price": None, "as_of": format_timestamp()} for t in tickers}
+
+    results: Dict[str, Dict[str, Optional[float]]] = {}
+
+    for symbol in tickers:
+        try:
+            # When downloading multiple tickers with group_by="ticker", columns are nested by ticker.
+            # When downloading a single ticker, columns are flat.
+            if isinstance(df.columns, pd.MultiIndex):
+                if symbol not in df.columns.get_level_values(0):
+                    results[symbol] = {"price": None, "as_of": format_timestamp()}
+                    continue
+                symbol_df = df[symbol]
+                close_series = symbol_df.get("Close")
+            else:
+                # Single ticker download
+                close_series = df.get("Close")
+
+            if close_series is None:
+                results[symbol] = {"price": None, "as_of": format_timestamp()}
+                continue
+
+            close_series = close_series.dropna()
+            if close_series.empty:
+                results[symbol] = {"price": None, "as_of": format_timestamp()}
+                continue
+
+            last_ts = close_series.index[-1]
+            last_price = close_series.iloc[-1]
+
+            results[symbol] = {
+                "price": safe_round(last_price, 4),
+                "as_of": _timestamp_to_iso_utc(pd.Timestamp(last_ts)),
+            }
+        except Exception:
+            results[symbol] = {"price": None, "as_of": format_timestamp()}
+
+    return results
+
+
+def create_us_major_etf_prices_json():
+    """Create a lightweight current-price snapshot JSON for SPY/DIA/IWM/QQQ."""
+    print("\nFetching US Major ETF prices snapshot...")
+
+    prices = fetch_latest_etf_prices(ETF_TICKERS)
+
+    output = {
+        "_README": {
+            "title": "US Major ETF Prices - Current Snapshot",
+            "description": "Lightweight current price snapshot for key US market ETFs (SPY/DIA/IWM/QQQ)",
+            "purpose": "Provide a small, easy-to-consume JSON for site widgets and pages that just need the latest ETF prices",
+            "update_frequency": ETF_PRICES_CONFIG.get("update_frequency") or "Every 10 minutes during market hours",
+            "data_source": "Yahoo Finance (yfinance)",
+            "notes": {
+                "pricing_field": "Price is the latest available intraday close from the most recent 5-minute bar.",
+                "after_hours": "After-hours and pre-market availability depends on Yahoo Finance; if unavailable, price may be null.",
+            },
+            "schema": {
+                "data.{TICKER}.price": "Latest available price (float)",
+                "data.{TICKER}.as_of": "Timestamp (UTC) of the bar used for price",
+            },
+        },
+        "metadata": {
+            "generated_at": format_timestamp(),
+            "tickers": ETF_TICKERS,
+            "ticker_count": len(ETF_TICKERS),
+            "data_source": "Yahoo Finance (yfinance)",
+        },
+        "data": prices,
+    }
+
+    output_path = os.path.join(SCRIPT_DIR, ETF_PRICES_OUTPUT_FILE)
+    save_json(output, output_path)
+    print(f"✅ Saved ETF prices snapshot to {output_path}")
+    return output
 
 
 def fetch_index_data(symbol: str, period: str = "1y", cache_dir: str = None) -> pd.DataFrame:
@@ -367,6 +481,9 @@ def main():
     
     # Create historical
     historical_data = create_historical_json()
+
+    # Create lightweight ETF current price snapshot (SPY/DIA/IWM/QQQ)
+    create_us_major_etf_prices_json()
     
     print("\n" + "=" * 80)
     print("✅ US MAJOR INDICES FETCH COMPLETE")
